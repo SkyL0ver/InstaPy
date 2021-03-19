@@ -73,15 +73,6 @@ def set_selenium_local_session(
     browser = None
     err_msg = ""
 
-    # set Firefox Agent to mobile agent
-    user_agent = (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 12_1 like Mac OS X) AppleWebKit/605.1.15 "
-        "(KHTML, like Gecko) FxiOS/18.1 Mobile/16B92 Safari/605.1.15"
-    )
-
-    # keep user_agent
-    Settings.user_agent = user_agent
-
     firefox_options = Firefox_Options()
 
     if headless_browser:
@@ -101,7 +92,7 @@ def set_selenium_local_session(
 
     # set English language
     firefox_profile.set_preference("intl.accept_languages", "en-US")
-    firefox_profile.set_preference("general.useragent.override", user_agent)
+    firefox_profile.set_preference("general.useragent.override", Settings.user_agent)
 
     if disable_image_load:
         # permissions.default.image = 2: Disable images load,
@@ -171,7 +162,7 @@ def proxy_authentication(browser, logger, proxy_username, proxy_password):
 
     # FIXME: https://github.com/SeleniumHQ/selenium/issues/7239
     # this feauture is not working anymore due to the Selenium bug report above
-    logger.warn(
+    logger.warning(
         "Proxy Authentication is not working anymore due to the Selenium bug "
         "report: https://github.com/SeleniumHQ/selenium/issues/7239"
     )
@@ -188,7 +179,7 @@ def proxy_authentication(browser, logger, proxy_username, proxy_password):
         )
         alert_popup.accept()
     except Exception:
-        logger.warn("Unable to proxy authenticate")
+        logger.warning("Unable to proxy authenticate")
 
 
 def close_browser(browser, threaded_session, logger):

@@ -113,22 +113,36 @@ session.like_by_tags(amount=10, use_smart_hashtags=True)
  `limit`: Defines amount limit of generated hashtags by hashtag
  `log_tags`: Shows generated hashtags before use it (default is True)
 
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Quota Supervisor
 ###### Take full control of the actions with the most sophisticated approaches
 
 ```python
-session.set_quota_supervisor(enabled=True, sleep_after=["likes", "comments_d", "follows", "unfollows", "server_calls_h"], sleepyhead=True, stochastic_flow=True, notify_me=True,
-                              peak_likes_hourly=57,
-                              peak_likes_daily=585,
-                               peak_comments_hourly=21,
-                               peak_comments_daily=182,
-                                peak_follows_hourly=48,
-                                peak_follows_daily=None,
-                                 peak_unfollows_hourly=35,
-                                 peak_unfollows_daily=402,
-                                  peak_server_calls_hourly=None,
-                                  peak_server_calls_daily=4700)
+session.set_quota_supervisor(enabled=True,
+                            sleep_after=["likes", "comments_d", "follows", "unfollows", "server_calls_h"],
+                            sleepyhead=True,
+                            stochastic_flow=True,
+                            notify_me=True,
+                            peak_likes_hourly=57,
+                            peak_likes_daily=585,
+                            peak_comments_hourly=21,
+                            peak_comments_daily=182,
+                            peak_follows_hourly=48,
+                            peak_follows_daily=None,
+                            peak_unfollows_hourly=35,
+                            peak_unfollows_daily=402,
+                            peak_server_calls_hourly=None,
+                            peak_server_calls_daily=4700)
 ```
 #### Parameters:
 `enabled`: put `True` to **activate** or `False` to **deactivate** supervising any time
@@ -303,6 +317,16 @@ session.like_by_tags(['soccer', 'cr7', 'neymar'], amount=100, media='Photo')
 
 ```
 
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Simulation
 ##### During indirect data retrieval, **simulation** happens to provide a _genuine_ activity flow triggered by a wise algorithm.
@@ -398,7 +422,7 @@ This will skip all business accounts except the ones that have a category that m
                         skip_no_profile_pic=True,
                         skip_business=True,
                         skip_non_business=True,
-                        dont_skip_business_categories=['Creators & Celebrities'])
+                        dont_skip_business_categories=['Creators &  Celebrities'])
  ```
  This will skip all non business and business accounts except categories in _dont_skip_business_categories_.
 
@@ -409,6 +433,17 @@ session.set_skip_users(skip_bio_keyword=["lifestyle"],
 ```
 This will skip users that have "lifestyle" and users that don't have "art" or "photography" in their bio or username.
 See the [Mandatory Words](#mandatory-words) section for details on how to define complex mandatory words conditions.
+
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Liking based on the number of existing likes a post has
 ##### This is used to check the number of existing likes a post has and if it _either_ **exceed** the _maximum_ value set OR **does not pass** the _minimum_ value set then it will not like that post
@@ -473,14 +508,14 @@ session.set_delimit_commenting(enabled=True, comments_mandatory_words=['cat', 'd
 ##### This is used to check the number of _followers_ and/or _following_ a user has and if these numbers _either_ **exceed** the number set OR **does not pass** the number set OR if **their ratio does not reach** desired potency ratio then no further interaction happens
 ```python
 session.set_relationship_bounds(enabled=True,
-				 potency_ratio=1.34,
-				  delimit_by_numbers=True,
-				   max_followers=8500,
-				    max_following=4490,
-				     min_followers=100,
-				      min_following=56,
-				       min_posts=10,
-                max_posts=1000)
+                                potency_ratio=1.34,
+                                delimit_by_numbers=True,
+                                max_followers=8500,
+                                max_following=4490,
+                                min_followers=100,
+                                min_following=56,
+                                min_posts=10,
+                                max_posts=1000)
 ```
 Use `enabled=True` to **activate** this feature, and `enabled=False` to **deactivate** it, _any time_
 `delimit_by_numbers` is used to **activate** & **deactivate** the usage of max & min values

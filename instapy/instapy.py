@@ -124,6 +124,7 @@ class InstaPy:
         geckodriver_path: str = None,
         split_db: bool = False,
         bypass_security_challenge_using: str = "email",
+        security_codes: int = 0000,
         want_check_browser: bool = True,
         browser_executable_path: str = None,
         geckodriver_log_level: str = "info",  # "info" by default
@@ -158,6 +159,7 @@ class InstaPy:
         self.page_delay = page_delay
         self.disable_image_load = disable_image_load
         self.bypass_security_challenge_using = bypass_security_challenge_using
+        self.security_codes = security_codes
 
         # choose environment over static typed credentials
         self.username = os.environ.get("INSTA_USER") or username
@@ -213,6 +215,7 @@ class InstaPy:
         self.automatedFollowedPool = {"all": [], "eligible": []}
         self.do_like = False
         self.like_percentage = 0
+        self.do_comment_liked_photo = False
         self.do_story = False
         self.story_percentage = 0
         self.story_simulate = False
@@ -430,6 +433,7 @@ class InstaPy:
             self.logfolder,
             self.proxy_address,
             self.bypass_security_challenge_using,
+            self.security_codes,
             self.want_check_browser,
         ):
             message = (
@@ -449,8 +453,15 @@ class InstaPy:
         try:
             save_account_progress(self.browser, self.username, self.logger)
         except Exception as e:
+            # Comment:
+            # Saw this error:
+            # "TypeError: window._sharedData.entry_data.ProfilePage is undefined"
+            # when IG deleted a pic or video due community guidelines, then the
+            # FF session shows a different page that interrupts the normal flow.
             self.logger.warning(
-                "Unable to save account progress, skipping data update " + str(e)
+                "Unable to save account progress, skipping data update \n\t{}".format(
+                    str(e).encode("utf-8")
+                )
             )
 
         # logs only followers/following numbers when able to login,
@@ -495,7 +506,12 @@ class InstaPy:
             }
         )
 
-    def set_do_comment(self, enabled: bool = False, percentage: int = 0):
+    def set_do_comment(
+        self,
+        enabled: bool = False,
+        comment_liked_photo: bool = False,
+        percentage: int = 0,
+    ):
         """
         Defines if images should be commented or not.
         E.g. percentage=25 means every ~4th picture will be commented.
@@ -505,6 +521,7 @@ class InstaPy:
             return self
 
         self.do_comment = enabled
+        self.do_comment_liked_photo = comment_liked_photo  # Comment a liked photo
         self.comment_percentage = percentage
 
         return self
@@ -708,7 +725,19 @@ class InstaPy:
             return
 
         for tag in tags:
-            req = requests.get("https://apidisplaypurposes.com/tag/{}".format(tag))
+            if python_version() > "3.5":
+                # CI Travis alert for Python3.5 and apidisplaypurposes
+                from apidisplaypurposes import displaypurposes
+
+                myToken = displaypurposes.generate_api_token(tag, Settings.user_agent)
+                head = {"User-Agent": Settings.user_agent, "api-token": myToken}
+                req = requests.get(
+                    "https://apidisplaypurposes.com/tag/{}".format(tag), headers=head
+                )
+            else:
+                # Old fashion request, must fail in Python <= 3.5
+                req = requests.get("https://apidisplaypurposes.com/tag/{}".format(tag))
+
             data = json.loads(req.text)
 
             if data["tagExists"] is True:
@@ -745,7 +774,7 @@ class InstaPy:
     def set_smart_location_hashtags(
         self, locations: list, radius: int = 10, limit: int = 3, log_tags: bool = True
     ):
-        """Generate smart hashtags based on https://displaypurposes.com/map"""
+        """Generate smart hashtags based on https://apidisplaypurposes.com/map"""
         if locations is None:
             self.logger.error("set_smart_location_hashtags is misconfigured")
             return self
@@ -763,7 +792,7 @@ class InstaPy:
                 bbox["lat_max"],
                 radius,
             )
-            url = "https://displaypurposes.com/local/?bbox={}".format(bbox_url)
+            url = "https://apidisplaypurposes.com/local/?bbox={}".format(bbox_url)
 
             req = requests.get(url)
             data = json.loads(req.text)
@@ -1535,10 +1564,13 @@ class InstaPy:
                             liked_img,
                         )
 
-                        if like_state is True:
-                            liked_img += 1
-                            # reset jump counter after a successful like
-                            self.jumps["consequent"]["likes"] = 0
+                        if like_state is True or self.do_comment_liked_photo:
+                            if self.do_comment_liked_photo:
+                                already_liked += 1
+                            else:
+                                liked_img += 1
+                                # reset jump counter after a successful like
+                                self.jumps["consequent"]["likes"] = 0
 
                             checked_img = True
                             temp_comments = []
@@ -1581,8 +1613,10 @@ class InstaPy:
                                     self.min_comments,
                                     self.comments_mandatory_words,
                                     self.username,
+                                    user_name,  # Comments with target user
                                     self.blacklist,
                                     self.browser,
+                                    link,
                                     self.logger,
                                     self.logfolder,
                                 )
@@ -1763,65 +1797,65 @@ class InstaPy:
                             except Exception as err:
                                 self.logger.error("Image check error: {}".format(err))
 
+                        # comments
                         if (
                             self.do_comment
                             and user_name not in self.dont_include
                             and checked_img
+                            and commenting
                         ):
                             comments = self.comments + (
                                 self.video_comments if is_video else self.photo_comments
                             )
 
-                            if comments:
-                                success = process_comments(
-                                    comments,
-                                    temp_comments,
-                                    self.delimit_commenting,
-                                    self.max_comments,
-                                    self.min_comments,
-                                    self.comments_mandatory_words,
-                                    self.username,
-                                    self.blacklist,
-                                    self.browser,
-                                    self.logger,
-                                    self.logfolder,
-                                )
-
-                                if success:
-                                    commented += 1
-                                    # reset jump counter after a
-                                    # successful comment
-                                    self.jumps["consequent"]["comments"] = 0
-
-                                    # try to follow
-                                    if (
-                                        self.do_follow
-                                        and user_name not in self.dont_include
-                                        and checked_img
-                                        and following
-                                        and not follow_restriction(
-                                            "read",
-                                            user_name,
-                                            self.follow_times,
-                                            self.logger,
-                                        )
-                                    ):
-                                        follow_state, msg = follow_user(
-                                            self.browser,
-                                            "post",
-                                            self.username,
-                                            user_name,
-                                            None,
-                                            self.blacklist,
-                                            self.logger,
-                                            self.logfolder,
-                                        )
-                                        if follow_state is True:
-                                            followed += 1
-
-                                    else:
-                                        self.logger.info("--> Not following")
-                                        sleep(1)
+                            success = process_comments(
+                                comments,
+                                temp_comments,
+                                self.delimit_commenting,
+                                self.max_comments,
+                                self.min_comments,
+                                self.comments_mandatory_words,
+                                self.username,
+                                user_name,  # Comments with target user
+                                self.blacklist,
+                                self.browser,
+                                link,
+                                self.logger,
+                                self.logfolder,
+                            )
+                            if success:
+                                commented += 1
+                                # reset jump counter after a
+                                # successful comment
+                                self.jumps["consequent"]["comments"] = 0
+                                # try to follow
+                                if (
+                                    self.do_follow
+                                    and user_name not in self.dont_include
+                                    and checked_img
+                                    and following
+                                    and not follow_restriction(
+                                        "read",
+                                        user_name,
+                                        self.follow_times,
+                                        self.logger,
+                                    )
+                                ):
+                                    follow_state, msg = follow_user(
+                                        self.browser,
+                                        "post",
+                                        self.username,
+                                        user_name,
+                                        None,
+                                        self.blacklist,
+                                        self.logger,
+                                        self.logfolder,
+                                    )
+                                    if follow_state is True:
+                                        followed += 1
+                                else:
+                                    self.logger.info("--> Not following")
+                                    sleep(1)
 
                             elif msg == "jumped":
                                 # will break the loop after certain
@@ -1882,11 +1916,11 @@ class InstaPy:
         elif use_smart_location_hashtags is True and self.smart_location_hashtags != []:
             self.logger.info("Using smart location hashtags")
             tags = self.smart_location_hashtags
-
-        # deletes white spaces in tags
-        tags = [tag.strip() for tag in tags]
-        tags = tags or []
-        self.quotient_breach = False
+        else:
+            # deletes white spaces in tags
+            tags = [tag.strip() for tag in tags]
+            tags = tags or []
+            self.quotient_breach = False
 
         # if session includes like_by_tags, then randomize the tag list
         if use_random_tags is True:
@@ -1970,10 +2004,13 @@ class InstaPy:
                             liked_img,
                         )
 
-                        if like_state is True:
-                            liked_img += 1
-                            # reset jump counter after a successful like
-                            self.jumps["consequent"]["likes"] = 0
+                        if like_state is True or self.do_comment_liked_photo:
+                            if self.do_comment_liked_photo:
+                                already_liked += 1
+                            else:
+                                liked_img += 1
+                                # reset jump counter after a successful like
+                                self.jumps["consequent"]["likes"] = 0
 
                             checked_img = True
                             temp_comments = []
@@ -2016,8 +2053,10 @@ class InstaPy:
                                     self.min_comments,
                                     self.comments_mandatory_words,
                                     self.username,
+                                    user_name,  # Comments with target user
                                     self.blacklist,
                                     self.browser,
+                                    link,
                                     self.logger,
                                     self.logfolder,
                                 )
@@ -2260,11 +2299,14 @@ class InstaPy:
                             self.logfolder,
                             total_liked_img,
                         )
-                        if like_state is True:
-                            total_liked_img += 1
-                            liked_img += 1
-                            # reset jump counter after a successful like
-                            self.jumps["consequent"]["likes"] = 0
+                        if like_state is True or self.do_comment_liked_photo:
+                            if self.do_comment_liked_photo:
+                                already_liked += 1
+                            else:
+                                total_liked_img += 1
+                                liked_img += 1
+                                # reset jump counter after a successful like
+                                self.jumps["consequent"]["likes"] = 0
 
                             checked_img = True
                             temp_comments = []
@@ -2286,6 +2328,7 @@ class InstaPy:
                                         "Image check error: {}".format(err)
                                     )
 
+                            # comments
                             if (
                                 self.do_comment
                                 and user_name not in self.dont_include
@@ -2305,8 +2348,10 @@ class InstaPy:
                                     self.min_comments,
                                     self.comments_mandatory_words,
                                     self.username,
+                                    user_name,  # Comments with target user
                                     self.blacklist,
                                     self.browser,
+                                    link,
                                     self.logger,
                                     self.logfolder,
                                 )
@@ -2553,11 +2598,14 @@ class InstaPy:
                                 self.logfolder,
                                 total_liked_img,
                             )
-                            if like_state is True:
-                                total_liked_img += 1
-                                liked_img += 1
-                                # reset jump counter after a successful like
-                                self.jumps["consequent"]["likes"] = 0
+                            if like_state is True or self.do_comment_liked_photo:
+                                if self.do_comment_liked_photo:
+                                    already_liked += 1
+                                else:
+                                    total_liked_img += 1
+                                    liked_img += 1
+                                    # reset jump counter after a successful like
+                                    self.jumps["consequent"]["likes"] = 0
 
                                 # comment
                                 checked_img = True
@@ -2590,8 +2638,10 @@ class InstaPy:
                                         self.min_comments,
                                         self.comments_mandatory_words,
                                         self.username,
+                                        user_name,  # Comments with target user
                                         self.blacklist,
                                         self.browser,
+                                        link,
                                         self.logger,
                                         self.logfolder,
                                     )
@@ -2865,11 +2915,14 @@ class InstaPy:
                                 self.logfolder,
                                 total_liked_img,
                             )
-                            if like_state is True:
-                                total_liked_img += 1
-                                liked_img += 1
-                                # reset jump counter after a successful like
-                                self.jumps["consequent"]["likes"] = 0
+                            if like_state is True or self.do_comment_liked_photo:
+                                if self.do_comment_liked_photo:
+                                    already_liked += 1
+                                else:
+                                    total_liked_img += 1
+                                    liked_img += 1
+                                    # reset jump counter after a successful like
+                                    self.jumps["consequent"]["likes"] = 0
 
                                 # comment
                                 checked_img = True
@@ -2882,6 +2935,7 @@ class InstaPy:
                                             temp_comments,
                                             clarifai_tags,
                                         ) = self.query_clarifai()
+
                                     except Exception as err:
                                         self.logger.error(
                                             "Image check error: {}".format(err)
@@ -2901,8 +2955,10 @@ class InstaPy:
                                         self.min_comments,
                                         self.comments_mandatory_words,
                                         self.username,
+                                        user_name,  # Comments with target user
                                         self.blacklist,
                                         self.browser,
+                                        link,
                                         self.logger,
                                         self.logfolder,
                                     )
@@ -3169,6 +3225,198 @@ class InstaPy:
                     if self.aborting:
                         return self
                     sleep(1)
+
+        # final words
+        self.logger.info(
+            "Finished interacting {} people from {} users' `Followers`! xD\n".format(
+                interacted_all, len(usernames)
+            )
+        )
+
+        # find the feature-wide action sizes by taking a difference
+        liked = self.liked_img - liked_init
+        already_liked = self.already_liked - already_liked_init
+        commented = self.commented - commented_init
+        followed = self.followed - followed_init
+        inap_img = self.inap_img - inap_img_init
+
+        # print results
+        self.logger.info("Liked: {}".format(liked))
+        self.logger.info("Already Liked: {}".format(already_liked))
+        self.logger.info("Commented: {}".format(commented))
+        self.logger.info("Followed: {}".format(followed))
+        self.logger.info("Inappropriate: {}".format(inap_img))
+        self.logger.info("Not valid users: {}\n".format(not_valid_users))
+
+        self.not_valid_users += not_valid_users
+
+        return self
+
+    def interact_user_likers(
+        self,
+        usernames: list,
+        posts_grab_amount: int = 3,
+        interact_likers_per_post: int = 3,
+        randomize: bool = False,
+    ):
+        """
+        Interact with the likers of given user's posts.
+
+        set_do_comment, set_do_follow and set_do_like are applicable.
+
+        :param usernames: List of users with whose likers to interact.
+        :param posts_grab_amount: Amount of posts to get the likers from per given user.
+        :param interact_likers_per_post: Amount of likers to be interacted with per post.
+        :param randomize: If followers should be chosen randomly.
+        """
+
+        if self.aborting:
+            return self
+
+        if self.do_follow is not True and self.do_like is not True:
+            self.logger.info(
+                "Please enable following or liking in settings in order to "
+                "do interactions."
+            )
+            return self
+
+        elif self.user_interact_amount <= 0:
+            self.logger.info(
+                "Please choose an amount higher than zero in "
+                "`set_user_interact` in order to do interactions."
+            )
+            return self
+
+        if not isinstance(usernames, list):
+            usernames = [usernames]
+
+        if posts_grab_amount > 12:
+            self.logger.info(
+                "Sorry, you can only grab likers from first 12 posts for "
+                "given username now.\n"
+            )
+            posts_grab_amount = 12
+
+        interacted_all = 0
+        not_valid_users = 0
+        simulated_unfollow = 0
+
+        # hold the current global values for differentiating at the end
+        liked_init = self.liked_img
+        already_liked_init = self.already_liked
+        commented_init = self.commented
+        followed_init = self.followed
+        inap_img_init = self.inap_img
+
+        self.quotient_breach = False
+
+        for index, username in enumerate(usernames):
+            if self.quotient_breach:
+                break
+
+            self.logger.info(
+                "User '{}' [{}/{}]".format((username), index + 1, len(usernames))
+            )
+            try:
+                post_urls = get_photo_urls_from_profile(
+                    self.browser, username, posts_grab_amount, randomize, self.logger
+                )
+
+                if not isinstance(post_urls, list):
+                    post_urls = [post_urls]
+
+            except (TypeError, RuntimeWarning) as err:
+                if isinstance(err, RuntimeWarning):
+                    self.logger.warning(
+                        "Warning: {} , skipping to next user".format(err)
+                    )
+                    continue
+
+                else:
+                    self.logger.error("Sorry, an error occurred: {}".format(err))
+                    self.aborting = True
+                    return self
+
+            print("")
+            self.logger.info(
+                "Grabbed {} posts from '{}'s profile to do "
+                "interaction.".format(len(post_urls), username)
+            )
+
+            interacted_personal = 0
+
+            for post_index, post_url in enumerate(post_urls):
+                if self.quotient_breach:
+                    break
+
+                likers = users_liked(
+                    self.browser, post_url, interact_likers_per_post, self.logger
+                )
+                # This way of iterating will prevent sleep interference
+                # between functions
+                random.shuffle(likers)
+
+                self.logger.info(
+                    "Post '{}' [{}/{}]".format(
+                        (post_url), post_index + 1, len(post_urls)
+                    )
+                )
+
+                for liker_index, person in enumerate(likers):
+                    if self.quotient_breach:
+                        self.logger.warning(
+                            "--> Like quotient reached its peak!"
+                            "\t~leaving Interact-Likers activity\n"
+                        )
+                        break
+
+                    self.logger.info(
+                        "Liker '{}' [{}/{}]".format(
+                            (person), liker_index + 1, len(likers)
+                        )
+                    )
+
+                    validation, details = self.validate_user_call(person)
+                    if not validation:
+                        self.logger.info(details)
+                        not_valid_users += 1
+
+                        continue
+
+                    # Do interactions if any
+                    do_interact = (
+                        random.randint(0, 100) <= self.user_interact_percentage
+                    )
+
+                    if not do_interact:
+                        self.logger.info(
+                            "Skipping user '{}' due to the interaction "
+                            "percentage of {}".format(
+                                person, self.user_interact_percentage
+                            )
+                        )
+                        continue
+
+                    else:
+                        interacted_all += 1
+                        interacted_personal += 1
+
+                        self.logger.info(
+                            "Interaction [{}/{}]  |  Total Interaction: {}".format(
+                                interacted_personal, len(likers), interacted_all
+                            )
+                        )
+
+                        with self.feature_in_feature("interact_by_users", False):
+                            self.interact_by_users(
+                                person,
+                                self.user_interact_amount,
+                                self.user_interact_random,
+                                self.user_interact_media,
+                            )
+                        if self.aborting:
+                            return self
+                        sleep(1)
 
         # final words
         self.logger.info(
@@ -3957,7 +4205,8 @@ class InstaPy:
                     break
 
                 if randomize and random.choice([True, False]):
-                    self.logger.warning("Post Randomly Skipped...\n")
+                    # Just inform that this post is randomly skipped
+                    self.logger.info("Post randomly skipped...")
                     skipped_img += 1
                     continue
                 else:
@@ -4021,11 +4270,13 @@ class InstaPy:
                                     liked_img,
                                 )
 
-                                if like_state is True:
-                                    liked_img += 1
-                                    # reset jump counter after a successful
-                                    # like
-                                    self.jumps["consequent"]["likes"] = 0
+                                if like_state is True or self.do_comment_liked_photo:
+                                    if self.do_comment_liked_photo:
+                                        already_liked += 1
+                                    else:
+                                        liked_img += 1
+                                        # reset jump counter after a successful like
+                                        self.jumps["consequent"]["likes"] = 0
 
                                     checked_img = True
                                     temp_comments = []
@@ -4051,7 +4302,7 @@ class InstaPy:
                                                 "Image check error: {}".format(err)
                                             )
 
-                                    # commenting
+                                    # comments
                                     if (
                                         self.do_comment
                                         and user_name not in self.dont_include
@@ -4071,8 +4322,10 @@ class InstaPy:
                                             self.min_comments,
                                             self.comments_mandatory_words,
                                             self.username,
+                                            user_name,  # Comments with target user
                                             self.blacklist,
                                             self.browser,
+                                            link,
                                             self.logger,
                                             self.logfolder,
                                         )
@@ -4242,6 +4495,7 @@ class InstaPy:
         amount: int = None,
         live_match: bool = False,
         store_locally: bool = True,
+        verified_only: bool = False,
     ):
         """
          Gets and returns `followers` information of given user
@@ -4282,6 +4536,7 @@ class InstaPy:
             store_locally,
             self.logger,
             self.logfolder,
+            verified_only,
         )
         return grabbed_followers
 
@@ -4812,10 +5067,13 @@ class InstaPy:
                         liked_img,
                     )
 
-                    if like_state is True:
-                        liked_img += 1
-                        # reset jump counter after a successful like
-                        self.jumps["consequent"]["likes"] = 0
+                    if like_state is True or self.do_comment_liked_photo:
+                        if self.do_comment_liked_photo:
+                            already_liked += 1
+                        else:
+                            liked_img += 1
+                            # reset jump counter after a successful like
+                            self.jumps["consequent"]["likes"] = 0
 
                         checked_img = True
                         temp_comments = []
@@ -4834,6 +5092,7 @@ class InstaPy:
                             except Exception as err:
                                 self.logger.error("Image check error: {}".format(err))
 
+                        # comments
                         if (
                             self.do_comment
                             and user_name not in self.dont_include
@@ -4851,8 +5110,10 @@ class InstaPy:
                                 self.min_comments,
                                 self.comments_mandatory_words,
                                 self.username,
+                                user_name,  # Comments with target user
                                 self.blacklist,
                                 self.browser,
+                                url,
                                 self.logger,
                                 self.logfolder,
                             )
@@ -5802,7 +6063,7 @@ class InstaPy:
                             self.liked_img,
                         )
 
-                        if like_state is True:
+                        if like_state is True or self.do_comment_liked_photo:
                             self.liked_img += 1
 
                         elif msg == "block on likes":

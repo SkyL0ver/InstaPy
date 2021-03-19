@@ -1,6 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+###############################################################################
+# Note:
+# Update the xpaths with a generic form, try to avoid using xpaths like the
+# Browser is displaying; i.e.: /html/body/div[2]/div/div[2]/div[1]/div[2].
+# Usually the Browser use the most un-portable form and then it could be broken
+# after IG updates the DOM.
+#
+# Absolute: paths are the direct way to locate an element, "/html/body/div[2]"
+# Relative: starts with a double slash “//” that means it can start to search
+#           anywhere in the DOM structure, "//div[@class=’form-group’]"
+###############################################################################
+
 xpath = {}
 
 xpath["bypass_suspicious_login"] = {
@@ -18,7 +30,7 @@ xpath["dismiss_this_was_me"] = {
 
 xpath["class_selectors"] = {
     "likes_dialog_body_xpath": "//main",
-    "likes_dialog_close_xpath": "//div/button/span",
+    "likes_dialog_close_xpath": "//*[*[local-name()='svg']/@aria-label='Close']",
 }
 
 xpath["confirm_unfollow"] = {"button_xp": "//button[text()='Unfollow']"}
@@ -35,7 +47,7 @@ xpath["dismiss_notification_offer"] = {
     "dismiss_elem_loc": "//button[text()='Not Now']",
 }
 
-xpath["dissmiss_save_information"] = {
+xpath["dismiss_save_information"] = {
     "offer_elem_loc": "//*[contains(text(), 'Save Info')]",
     "dismiss_elem_loc": "//*[contains(text(), 'Not Now')]",
 }
@@ -74,8 +86,8 @@ xpath["get_comment_input"] = {
 }
 
 xpath["get_comments_on_post"] = {
-    "commenter_elem": "//h3/a",
-    "comments_block": "//div/div/h3/../../../..",
+    "commenter_elem": "//*[contains(@class,'FPmhX')]",
+    "comments_block": "//*[contains(@class,'EtaWk')]",
     "like_button_full_XPath": "//*[*[local-name()='svg']/@aria-label='Like']",
     "unlike_button_full_XPath": "//*[*[local-name()='svg']/@aria-label='Unlike']",
 }
@@ -141,7 +153,7 @@ xpath["get_users_through_dialog"] = {"find_dialog_box": "//body/div[4]/div/div[2
 xpath["is_private_profile"] = {"is_private": '//h2[@class="_kcrwx"]'}
 
 xpath["like_comment"] = {
-    "comments_block": "//div/div/h3/../../../..",
+    "comments_block": "//*[contains(@class,'EtaWk')]",
     "span_like_elements": "//span[@aria-label='Like']",
     "comment_like_button": "..",
 }
@@ -170,6 +182,8 @@ xpath["login_user"] = {
     "add_phone_number": "//h2[text()='Add Your Phone Number']",
     "suspicious_login_attempt": "//p[text()='Suspicious Login Attempt']",
     "error_alert": "//p[@id='slfErrorAlert']",
+    "verification_code": "//input[@name='verificationCode']",
+    "confirm": "//button[text()='Confirm']",
 }
 
 xpath["open_comment_section"] = {
@@ -186,11 +200,13 @@ xpath["watch_story_for_tag"] = {"explore_stories": "//section/main/header/div[1]
 xpath["watch_story_for_user"] = {"explore_stories": "//section/main/div/header/div/div"}
 
 xpath["watch_story"] = {
-    "next_first": "/html/body/span/section/div/div/section/div[2]/button",
-    "next": "/html/body/span/section/div/div/section/div[2]/button[2]",
+    "next_first": "//*[contains(@class,'Cd8X1')]",
+    "next": "//*[contains(@class,'FhutL')]",
 }
 
 xpath["likers_from_photo"] = {
     "liked_counter_button": "//a[contains(@href,'liked_by')]/span",
     "second_counter_button": "//a[contains(@href,'liked_by')]",
 }
+
+xpath["accept_igcookie_dialogue"] = {"accept_button": "//button[text()='Accept']"}

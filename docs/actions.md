@@ -88,6 +88,16 @@ session.comment_by_locations(['224442573'], amount=5, skip_top_posts=False)
 
 This method allows commenting by locations, without liking posts. To get locations follow instructions in 'Like by Locations'
 
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Follow by Tags
 
@@ -142,12 +152,17 @@ accs = ['therock','natgeo']
 session.follow_by_list(accs, times=1, sleep_delay=600, interact=False)
 ```
 * You can also **interact** with the followed users by enabling `interact=True` which will use the configuration of `set_user_interact` setting:
+
 ```python
 session.set_user_interact(amount=4,
-				 percentage=50,
-                  randomize=True,
-                   media='Photo')
-session.follow_by_list(followlist=['samantha3', 'larry_ok'], times=2, sleep_delay=600, interact=True)
+                          percentage=50,
+                          randomize=True,
+                          media='Photo')
+
+session.follow_by_list(followlist=['samantha3', 'larry_ok'],
+                       times=2,
+                       sleep_delay=600,
+                       interact=True)
 ```
 
 
@@ -201,6 +216,16 @@ session.set_user_interact(amount=5, randomize=True, percentage=50, media='Photo'
 session.follow_user_followers(['friend1', 'friend2', 'friend3'], amount=10, randomize=False, interact=True)
 ```
 
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Follow the likers of photos of users
 ##### This will follow the people those liked photos of given list of users
@@ -217,10 +242,16 @@ The `follow_likers_per_photo` is how many people to follow per each photo
 * You can also **interact** with the followed users by enabling `interact=True` which will use the configuration of `set_user_interact` setting:
 ```python
 session.set_user_interact(amount=2,
-				 percentage=70,
-                  randomize=True,
-                   media='Photo')
-session.follow_likers(['user1' , 'user2'], photos_grab_amount = 2, follow_likers_per_photo = 3, randomize=True, sleep_delay=600, interact=True)
+                          percentage=70,
+                          randomize=True,
+                          media='Photo')
+
+session.follow_likers(['user1' , 'user2'],
+                      photos_grab_amount = 2,
+                      follow_likers_per_photo = 3,
+                      randomize=True,
+                      sleep_delay=600,
+                      interact=True)
 ```
 
 
@@ -239,9 +270,9 @@ The `max_pic` will limit number of photos to analyze
 * You can also **interact** with the followed users by enabling `interact=True` which will use the configuration of `set_user_interact` setting:
 ```python
 session.set_user_interact(amount=3,
-				 percentage=32,
-                  randomize=True,
-                   media='Video')
+                          percentage=32,
+                          randomize=True,
+                          media='Video')
 session.follow_commenters(['user1', 'user2', 'user3'], amount=100, daysold=365, max_pic = 100, sleep_delay=600, interact=True)
 ```
 
@@ -402,6 +433,16 @@ session.interact_user_followers(['natgeo'], amount=10, randomize=True)
 ```
 > **Note**: [simulation](#simulation) takes place while running this feature.
 
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Interact with users that someone else is following
 
@@ -530,6 +571,28 @@ session.interact_by_comments(usernames=["somebody", "other.buddy"], posts_amount
 + liking a comment doesn't fill up your like quota, but replying to a comment does it to the comment quota. Try to compensate it in your style and do not overuse;
 + using auto-reply capability of this feature can result in unwanted miscommunication between you and the commenter IN CASE OF you do not make an efficient use of text analytics;
 
+### Interact by Likers
+###### Get a user's posts, get the posts' likers and interact with them.
+
+```python
+session.interact_user_likers(usernames=["somebody", "other buddy"],
+                             posts_grab_amount=10,
+                             interact_likers_per_post=5,
+                             randomize=True)
+```
+#### Parameters
+`usernames`
+: A list containing the _usernames_ of users on whose **posts'** _likers will be interacted with_;
+
+`posts_grab_amount`
+: Number of the posts to get from **each user** for getting its likers to interact with;
+
+`interact_likers_per_post`
+: Choose how many likers to get from **each post**;
+
+`randomize`
+: Shuffles the **order** of the **_posts_** from users' feed;
+
 
 ### Accept pending follow requests
 
@@ -560,15 +623,15 @@ session.remove_follow_requests(amount=200, sleep_delay=600)
   ```python
 
  photo_comments = ['Nice shot! @{}',
-                   'I love your profile! @{}',
- 	           'Your feed is an inspiration :thumbsup:',
- 	           'Just incredible :open_mouth:',
- 	           'What camera did you use @{}?',
- 	           'Love your posts @{}',
- 	           'Looks awesome @{}',
- 	           'Getting inspired by you @{}',
- 	           ':raised_hands: Yes!',
- 	           'I can feel your passion @{} :muscle:']
+                  'I love your profile! @{}',
+ 	                'Your feed is an inspiration :thumbsup:',
+ 	                'Just incredible :open_mouth:',
+ 	                'What camera did you use @{}?',
+ 	                'Love your posts @{}',
+ 	                'Looks awesome @{}',
+ 	                'Getting inspired by you @{}',
+ 	                ':raised_hands: Yes!',
+ 	                'I can feel your passion @{} :muscle:']
 
  session = InstaPy()
 

@@ -19,7 +19,6 @@ If the web driver you're using doesn't support headless mode (or the headless mo
 session = InstaPy(username='test', password='test', nogui=True)
 ```
 
-
 ### Bypass Suspicious Login Attempt
 
 InstaPy detects automatically if the Security Code Challenge
@@ -36,20 +35,43 @@ InstaPy(username=insta_username,
         bypass_security_challenge_using='sms')
 ```
 
+### Two Factor Authentication
+InstaPy detects automatically if the account is protected with the Two Factor Authentication, if yes InstaPy user need to provide the Security codes in the session constructor; at least one code is required.
+
+Security codes can be found in: `Settings` -> `Security` -> `Two-Factor-Authentication` -> `Backup Codes`
+
+```python
+InstaPy(username=insta_username,
+        password=insta_password,
+        security_codes=["01234567", "76543210", "01237654"],)
+```
+
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
 ### Use a proxy
 
 You can use InstaPy behind a proxy by specifying server address, port and/or proxy authentication credentials. It works with and without ```headless_browser``` option.
 
 Simple proxy setup example:
+
 ```python
 session = InstaPy(username=insta_username,
                   password=insta_password,
-		  proxy_address='8.8.8.8',
-		  proxy_port=8080)
-
+                  proxy_address='8.8.8.8',
+                  proxy_port=8080)
 ```
 
 Proxy setup with authentication example:
+
 ```python
 session = InstaPy(username=insta_username,
                   password=insta_password,
@@ -64,7 +86,8 @@ InstaPy can perform a few checks online, including you connection and the availa
 
 `want_check_browser` default is False, you can set it to True at session start. Recommend to do this if you want to add additional checks for the connection to the web and Instagram.
 
-example:
+For example:
+
 ```python
 session = InstaPy(username=insta_username,
                   password=insta_password,
@@ -76,6 +99,7 @@ If you're running InstaPy in threads and get exception `ValueError: signal only 
 There is two ways to do it:
 
 Closing session in smart_run context:
+
 ```python
 session = InstaPy()
 with smart_run(session, threaded=True):
@@ -83,8 +107,8 @@ with smart_run(session, threaded=True):
     # some activity here ...
 ```
 
-
 Closing session with `end()` method
+
 ```python
 session = InstaPy()
 session.login()
@@ -99,9 +123,21 @@ Specifying the Firefox executable path can also help you if you are getting the 
 
 `selenium.common.exceptions.SessionNotCreatedException: Message: Unable to find a matching set of capabilities`
 
-example on a Windows machine (with the right path also works on Linux and MAC)
+Example on a Windows machine (with the right path also works on Linux and macOS)
+
 ```python
 session = InstaPy(username=insta_username,
                   password=insta_password,
                   browser_executable_path=r"D:\Program Files\Mozilla Firefox\firefox.exe")
 ```
+
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>

@@ -30,6 +30,7 @@ def get_followers(
     store_locally,
     logger,
     logfolder,
+    verified_only=False,
 ):
     """ Get entire list of followers using graphql queries. """
 
@@ -83,7 +84,11 @@ def get_followers(
         or (is_private is True and following_status not in ["Following", True])
         or (following_status == "Blocked")
     ):
-        logger.info("This user is private and we are not following")
+        logger.info(
+            "This user is private and we are not following. '{}':'{}'".format(
+                is_private, following_status
+            )
+        )
         # Changed False to all_followers[], all_followers is empty
         return all_followers
 
@@ -185,12 +190,18 @@ def get_followers(
             page_info = data["user"]["edge_followed_by"]["page_info"]
             edges = data["user"]["edge_followed_by"]["edges"]
             for user in edges:
-                all_followers.append(user["node"]["username"])
+                # If verified_only is True, determine if user is verified before adding to all_followers
+                if verified_only:
+                    if user["node"]["is_verified"]:
+                        all_followers.append(user["node"]["username"])
+                else:
+                    all_followers.append(user["node"]["username"])
 
             grabbed = len(set(all_followers))
 
             # write & update records at Progress Tracker
             progress_tracker(grabbed, highest_value, start_time, logger)
+            print("\n")
 
             finish_time = time.time()
             diff_time = finish_time - start_time
@@ -366,7 +377,11 @@ def get_following(
         or (is_private is True and following_status not in ["Following", True])
         or (following_status == "Blocked")
     ):
-        logger.info("This user is private and we are not following")
+        logger.info(
+            "This user is private and we are not following. '{}':'{}'".format(
+                is_private, following_status
+            )
+        )
         return False
 
     # sets the amount of usernames to be matched in the next queries
@@ -479,6 +494,7 @@ def get_following(
 
             # write & update records at Progress Tracker
             progress_tracker(grabbed, highest_value, start_time, logger)
+            print("\n")
 
             finish_time = time.time()
             diff_time = finish_time - start_time

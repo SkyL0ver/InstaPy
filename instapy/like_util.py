@@ -65,7 +65,7 @@ def get_links_from_feed(browser, amount, num_of_search, logger):
             logger.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
     except BaseException as e:
-        logger.error("link_elems error {}".format(str(e)))
+        logger.error("link_elems error \n\t{}".format(str(e).encode("utf-8")))
 
     return links
 
@@ -448,6 +448,11 @@ def get_links_for_username(
     if taggedImages:
         user_link = user_link + "tagged/"
 
+    # if private user, we can get links only if we following
+    following_status, _ = get_following_status(
+        browser, "profile", username, person, None, logger, logfolder
+    )
+
     # Check URL of the webpage, if it already is user's profile page,
     # then do not navigate to it again
     web_address_navigator(browser, user_link)
@@ -459,11 +464,6 @@ def get_links_for_username(
         )
         return False
 
-    # if private user, we can get links only if we following
-    following_status, _ = get_following_status(
-        browser, "profile", username, person, None, logger, logfolder
-    )
-
     # if following_status is None:
     #    browser.wait_for_valid_connection(browser, username, logger)
 
@@ -471,12 +471,17 @@ def get_links_for_username(
     #    browser.wait_for_valid_authorization(browser, username, logger)
 
     is_private = is_private_profile(browser, logger, following_status == "Following")
+
     if (
         is_private is None
         or (is_private is True and following_status not in ["Following", True])
         or (following_status == "Blocked")
     ):
-        logger.info("This user is private and we are not following")
+        logger.info(
+            "This user is private and we are not following. '{}':'{}'".format(
+                is_private, following_status
+            )
+        )
         return False
 
     # Get links
@@ -487,7 +492,7 @@ def get_links_for_username(
 
     if posts_count is not None and amount > posts_count:
         logger.info(
-            "You have requested to get {} posts from {}'s profile page BUT"
+            "You have requested to get {} posts from {}'s profile page but"
             " there only {} posts available :D".format(amount, person, posts_count)
         )
         amount = posts_count
@@ -881,7 +886,8 @@ def get_links(browser, page, logger, media, element):
     try:
         # Get image links in scope from hashtag, location and other pages
         link_elems = element.find_elements_by_xpath('//a[starts-with(@href, "/p/")]')
-        sleep(2)
+        sleep(random.randint(2, 5))
+
         if link_elems:
             for link_elem in link_elems:
                 try:
@@ -904,14 +910,22 @@ def get_links(browser, page, logger, media, element):
 
                         if post_category in media:
                             links.append(post_href)
+
                 except WebDriverException:
-                    logger.info(
-                        "Cannot detect post media type. Skip {}".format(post_href)
-                    )
+                    # If "post_href" is None skip the logger to avoid confusion,
+                    # the links that are not empty will be catched into the next
+                    # loop. Other case, the "post_href" is not empty and needs
+                    # to be displayed to the STDOUT fo further review.
+                    if post_href:
+                        logger.info(
+                            "Cannot detect post media type. Skip {}".format(post_href)
+                        )
         else:
             logger.info("'{}' page does not contain a picture".format(page))
+
     except BaseException as e:
-        logger.error("link_elems error {}".format(str(e)))
+        logger.error("link_elems error \n\t{}".format(str(e).encode("utf-8")))
+
     return links
 
 
@@ -1014,7 +1028,7 @@ def like_comment(browser, original_comment_text, logger):
 
     except (NoSuchElementException, StaleElementReferenceException) as exc:
         logger.error(
-            "Error occured while liking a comment.\n\t{}\n\n".format(
+            "Error occured while liking a comment.\n\t{}".format(
                 str(exc).encode("utf-8")
             )
         )

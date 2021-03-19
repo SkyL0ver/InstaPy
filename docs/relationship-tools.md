@@ -45,6 +45,13 @@ _If the data is requested at the range **else than** `"full"`, it will write **t
 + `6874` means the **count** of the usernames retrieved.
 + `json` is the **filetype** and the data is stored as a `list` in it.
 
+`verified_only`:
+Gives the _option_ to only return followers with a Verified status.
+* `verified_only=True`:
+    + Only returns followers that contain `is_verified` key
+* `verified_only=False`:
+    + Default option, Returns all followers for user
+
 
 There are **several** `use cases` of this tool for **various purposes**.
 _E.g._, inside your **quickstart** script, you can **do** _something like this_:
@@ -61,6 +68,16 @@ popeye_cinderella_followers = [follower for follower in popeye_followers if foll
 #### PROs
 You can **use** this tool to take a **backup** of _your_ **or** _any other user's_ **current** followers.
 
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Grab Following of a user
 ###### Gets and returns `following` of the given user in desired amount, also can save locally
@@ -201,6 +218,16 @@ sleep(200)
 session.unfollow_users(amount=len(active_unfollowers), customList=(True, active_unfollowers, "all"), style="RANDOM", unfollow_after=None, sleep_delay=600)
 ```
 
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
 ### Pick Nonfollowers of a user
 ###### Compares the `Followers` data against `Following` data of a user and returns the `Nonfollowers` data
@@ -339,3 +366,14 @@ There are **several** `use cases` of this tool for **various purposes**.
     Winnie_mutual_following = session.pick_mutual_following(username="WinnieThePooh", live_match=True, store_locally=True)
     ##now, he will write a message to his mutual followers to help him get a new honey pot :>
     ```
+
+<ins
+  class="adsbygoogle"
+  data-ad-layout="in-article"
+  data-ad-format="fluid"
+  data-ad-client="ca-pub-4875789012193531"
+  data-ad-slot="9530237054"
+></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
