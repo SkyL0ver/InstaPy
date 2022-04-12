@@ -4,14 +4,41 @@ The **goal** of this file is explaining to the users of our project the notable 
 
 _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)_
 
+## [0.6.17] - 2022-01-19 - [Unreleased]
 
-## [0.6.15] - UNRELEASED
+### Fixed
+
+- Fixed project homepage to [InstaPy](https://github.com/InstaPy/InstaPy)
+
+## [0.6.16] - 2021-12-11
+
 ### Added
 
-- Added `verified_only` argument to `get_followers` to return only verified users
-- `mandatory_bio_keywords` control before evaluating for mandatory
+- Added filter in `extract_text_from_element()` for non-username elements.
 
-## [0.6.14] - UNRELEASED
+### Fixed
+
+- Fixed `is_private_profile()` when 'NoneType' object is not subscriptable
+- Fixed `find_element*()` to `find_element()`
+
+## [0.6.16] - 2021-12-11
+
+### Added
+
+- Added filter in `extract_text_from_element()` for non-username elements.
+
+### Fixed
+
+- Fixed `is_private_profile()` when 'NoneType' object is not subscriptable
+- Fixed `find_element*()` to `find_element()`
+
+## [0.6.15] - 2021-12-02
+
+### Fixed
+
+- Fixed `relationship_tools` to check if not `username == self_username`
+
+## [0.6.14] - 2021-10-18
 
 ### Added
 
@@ -21,6 +48,10 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Added second `accept_igcookie_dialogue` to handled the second "cookie accept screen" that is not automatically accepted
 - Added delays after `update_activity()` in `follow_util.py` and `util.py`
 - Added extra trace in `get_followers()`
+- Added `verified_only` argument to `get_followers` to return only verified users
+- `mandatory_bio_keywords` control before evaluating for mandatory
+- Fix user following and verification of follow
+- Skipping of public account with (optional) percentage
 
 ### Fixed
 
@@ -28,6 +59,15 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Fixed the correct URL `displaypurposes.com`, the old `displaypurposes.com` API is deprecated
 - Fixed `additional-information.md`, removed extra info for `cron` configuration
 - Fixed `actions.md` and `settings.md` for identation
+- Fixed getting additional data from page source
+- Fixed xpath for when images cannot be detected
+- Fixed empty shared data
+- Cannot detect post media type
+- Updated xpath Image "Like" and "Unlike"
+
+### Changed
+
+- Change the ip data supplier to <https://freegeoip.app/> from <https://seeip.org/>
 
 ## [0.6.13] - 2020-12-30
 
@@ -92,12 +132,15 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [0.6.11] - 2020-09-25
 
 ### Added
+
 - Use random tag list for `session.like_by_tags`
 
 ### Changed
+
 - General log rotation, gecko driver log in user directory, comments in 80 chars
 
 ### Fixed
+
 - Unfollowing of users that haven't posted anything
 - `get_links` xpath for yet another change
 - Path for Obtaining user id
@@ -173,7 +216,6 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Small typos in documentation
 - Firefox Proxy error
 
-
 ## [0.6.4] - 2019-09-15
 
 ### Fixed
@@ -181,7 +223,6 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - prettyfied code
 - fixed onetap account page on login
 - fix minor bug in unfollow function
-
 
 ## [0.6.3] - 2019-09-08
 
@@ -200,7 +241,6 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - skip_top_posts function
 - Backup plan for graphql additional / shared data
 
-
 ## [0.6.2] - 2019-08-30
 
 ### Added
@@ -211,7 +251,6 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Fixed
 
 - Login xpath update
-
 
 ## [0.6.1] - 2019-08-12
 
@@ -225,7 +264,6 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Fix an issue with JSON file state creation
 - Fix Get Query Hash function to work on all Python 3.x versions
 - Fix Unfollow with option nonFollowers
-
 
 ## [0.6.0] - 2019-08-12
 
@@ -638,7 +676,7 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Fixed
 
-- Remove https://i.instagram.com/api/v1/users/{}/info/ as it not working and killing the unfollow with error.
+- Remove <https://i.instagram.com/api/v1/users/{}/info/> as it not working and killing the unfollow with error.
 - Fix logging uncertain having no userid nor time log, will be important for sync feature.
 - Fix get active users when Video have no likes button / no posts in page.
 

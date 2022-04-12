@@ -43,7 +43,7 @@ comments=[
     {'mandatory_words': [["high", "tide"]], 'comments': ["High tides are better than low"]}
 
     # Only "summer" AND ("lake" OR "occean") will satisfy this:
-    {'mandatory_words': [["summer", ["lake", "occean"]], 'comments': ["Summer fun"]}
+    {'mandatory_words': [["summer", ["lake", "occean"]]], 'comments': ["Summer fun"]}
 
 ]
 session.set_comments(comments)
@@ -340,7 +340,7 @@ session.set_simulation(enabled=True, percentage=66)
 ```
 
 
-### Skipping user for private account, no profile picture, business account, bio keywords
+### Skipping user for private account, public account, no profile picture, business account, bio keywords
 
 #### This is used to skip users with certain condition
 ```python
@@ -354,7 +354,9 @@ session.set_skip_users(skip_private=True,
                        skip_business_categories=[],
                        dont_skip_business_categories=[],
                        skip_bio_keyword=[],
-                       mandatory_bio_keywords=[])
+                       mandatory_bio_keywords=[],
+                       skip_public=False,
+                       public_percentage=0)
 ```
 ##### Skip private account
 **This is done by default**
@@ -366,6 +368,17 @@ Will skip users that have private account, even if are followed by running accou
 You can set a percentage of skipping:
     _private_percentage_= 100 always skip private users
     _private_percentage_= 0 never skip private users (so set skip_private=False)
+
+##### Skip public account
+```python
+session.set_skip_users(skip_private=False,
+                       skip_public=True,
+                       public_percentage=100)
+```
+Will skip users that have public account.
+You can set a percentage of skipping:
+    _private_percentage_= 100 always skip public users
+    _private_percentage_= 0 never skip public users (so set skip_public=False)
 
 ##### Skip users that don't have profile picture
 
@@ -414,7 +427,7 @@ session.set_skip_users(skip_private=True,
 This will skip all business accounts except the ones that have a category that matches one item in the list of _dont_skip_business_categories_
 **N.B.** If both _dont_skip_business_categories_ and _skip_business_categories_, InstaPy will skip only business accounts in the list given from _skip_business_categories_.
 
-> [A list of all availlable business categories can be found here](https://github.com/InstaPy/instapy-docs/blob/master/BUSINESS_CATEGORIES.md)
+> [A list of all available business categories can be found here](https://github.com/InstaPy/instapy-docs/blob/master/BUSINESS_CATEGORIES.md)
 
 ###### Skip all non business and bussines accounts, except from list given
  ```python
@@ -493,7 +506,7 @@ _**Now**, if a post has more comments than the maximum value of `70`, then it wi
 
 ### Commenting based on mandatory words in the description or first comment
 
-##### This is used to check the description of the post and the first comment of the post (some users only put tags in the comments instead of the post description) for the occurence of mandatory words before commenting. If none of the mandatory words is present, the post will not be commented.
+##### This is used to check the description of the post and the first comment of the post (some users only put tags in the comments instead of the post description) for the occurrence of mandatory words before commenting. If none of the mandatory words is present, the post will not be commented.
 
 This feature is helpful when you want to comment only on specific tags.
 

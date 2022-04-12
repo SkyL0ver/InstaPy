@@ -1,104 +1,107 @@
 """OS Modules environ method to get the setup vars from the Environment"""
 # import built-in & third-party modules
-import time
-import random
-import os
 import csv
 import json
-import requests
-import unicodedata
 import logging
 import logging.handlers
-
-from datetime import datetime
-from datetime import timedelta
-from math import ceil
-from sys import platform
-from platform import python_version
-from selenium import webdriver
-from selenium.webdriver import DesiredCapabilities
-from logging.handlers import RotatingFileHandler
+import os
+import random
+import time
+import unicodedata
 from contextlib import contextmanager
 from copy import deepcopy
+from datetime import datetime, timedelta
+from logging.handlers import RotatingFileHandler
+from math import ceil
+from platform import python_version
+from sys import platform
+
+import requests
+from selenium import webdriver
+from selenium.webdriver import DesiredCapabilities
+from selenium.webdriver.common.by import By
 
 try:
     from pyvirtualdisplay import Display
 except ModuleNotFoundError:
     pass
 
-# import InstaPy modules
-from . import __version__
-from .constants import MEDIA_PHOTO
-from .constants import MEDIA_VIDEO
-from .clarifai_util import check_image
-from .comment_util import comment_image
-from .comment_util import get_comments_on_post
-from .comment_util import process_comments
-from .like_util import check_link
-from .like_util import verify_liking
-from .like_util import get_links_for_tag
-from .like_util import get_links_from_feed
-from .like_util import get_tags
-from .like_util import get_links_for_location
-from .like_util import like_image
-from .like_util import get_links_for_username
-from .like_util import like_comment
-from .story_util import watch_story
-from .login_util import login_user
-from .settings import Settings
-from .settings import localize_path
-from .print_log_writer import log_follower_num
-from .print_log_writer import log_following_num
-from .time_util import sleep
-from .time_util import set_sleep_percentage
-from .util import get_active_users
-from .util import validate_username
-from .util import web_address_navigator
-from .util import interruption_handler
-from .util import highlight_print
-from .util import dump_record_activity
-from .util import truncate_float
-from .util import save_account_progress
-from .util import parse_cli_args
-from .util import get_cord_location
-from .util import get_bounding_box
-from .util import file_handling
-from .util import scroll_down
-from .unfollow_util import get_given_user_followers
-from .unfollow_util import get_given_user_following
-from .unfollow_util import unfollow
-from .unfollow_util import unfollow_user
-from .unfollow_util import follow_user
-from .unfollow_util import follow_restriction
-from .unfollow_util import dump_follow_restriction
-from .unfollow_util import set_automated_followed_pool
-from .unfollow_util import get_follow_requests
-from .commenters_util import extract_information
-from .commenters_util import users_liked
-from .commenters_util import get_photo_urls_from_profile
-from .relationship_tools import get_following
-from .relationship_tools import get_followers
-from .relationship_tools import get_unfollowers
-from .relationship_tools import get_nonfollowers
-from .relationship_tools import get_fans
-from .relationship_tools import get_mutual_following
-from .database_engine import get_database
-from .text_analytics import text_analysis
-from .text_analytics import yandex_supported_languages
-from .browser import set_selenium_local_session
-from .browser import close_browser
-from .file_manager import get_workspace
-from .file_manager import get_logfolder
-from .pods_util import group_posts
-from .pods_util import get_recent_posts_from_pods
-from .pods_util import share_my_post_with_pods
-from .pods_util import share_with_pods_restriction
-from .pods_util import comment_restriction
-from .xpath import read_xpath
-
 # import exceptions
 from selenium.common.exceptions import NoSuchElementException
+
+# import InstaPy modules
+from . import __version__
+from .browser import close_browser, set_selenium_local_session
+from .clarifai_util import check_image
+from .comment_util import comment_image, get_comments_on_post, process_comments
+from .commenters_util import (
+    extract_information,
+    get_photo_urls_from_profile,
+    users_liked,
+)
+from .constants import MEDIA_PHOTO, MEDIA_VIDEO
+from .database_engine import get_database
 from .exceptions import InstaPyError
+from .file_manager import get_logfolder, get_workspace
+from .like_util import (
+    check_link,
+    get_links_for_location,
+    get_links_for_tag,
+    get_links_for_username,
+    get_links_from_feed,
+    get_tags,
+    like_comment,
+    like_image,
+    verify_liking,
+)
+from .login_util import login_user
+from .pods_util import (
+    comment_restriction,
+    get_recent_posts_from_pods,
+    group_posts,
+    share_my_post_with_pods,
+    share_with_pods_restriction,
+)
+from .print_log_writer import log_follower_num, log_following_num
+from .relationship_tools import (
+    get_fans,
+    get_followers,
+    get_following,
+    get_mutual_following,
+    get_nonfollowers,
+    get_unfollowers,
+)
+from .settings import Settings, localize_path
+from .story_util import watch_story
+from .text_analytics import text_analysis, yandex_supported_languages
+from .time_util import set_sleep_percentage, sleep
+from .unfollow_util import (
+    dump_follow_restriction,
+    follow_restriction,
+    follow_user,
+    get_follow_requests,
+    get_given_user_followers,
+    get_given_user_following,
+    set_automated_followed_pool,
+    unfollow,
+    unfollow_user,
+)
+from .util import (
+    dump_record_activity,
+    file_handling,
+    get_active_users,
+    get_bounding_box,
+    get_cord_location,
+    highlight_print,
+    interruption_handler,
+    parse_cli_args,
+    save_account_progress,
+    scroll_down,
+    truncate_float,
+    validate_username,
+    web_address_navigator,
+)
+from .xpath import read_xpath
 
 
 class InstaPy:
@@ -272,6 +275,8 @@ class InstaPy:
         self.skip_non_business = False
         self.skip_no_profile_pic = False
         self.skip_private = True
+        self.skip_public = False
+        self.skip_public_percentage = 0
         self.skip_business_percentage = 100
         self.skip_no_profile_pic_percentage = 100
         self.skip_private_percentage = 100
@@ -491,7 +496,7 @@ class InstaPy:
         random_range_to: int = None,
         safety_match: bool = True,
     ):
-        """ Set custom sleep delay after actions """
+        """Set custom sleep delay after actions"""
         Settings.action_delays.update(
             {
                 "enabled": enabled,
@@ -902,7 +907,7 @@ class InstaPy:
         sleep_delay: int = 600,
         interact: bool = False,
     ):
-        """ Follows users' commenters """
+        """Follows users' commenters"""
 
         if self.aborting:
             return self
@@ -925,7 +930,7 @@ class InstaPy:
         inap_img_init = self.inap_img
 
         relax_point = random.randint(7, 14)  # you can use some plain value
-        # `10` instead of this quitely randomized score
+        # `10` instead of this quietly randomized score
         self.quotient_breach = False
 
         for username in usernames:
@@ -1022,7 +1027,7 @@ class InstaPy:
         sleep_delay: int = 600,
         interact: bool = False,
     ):
-        """ Follows users' likers """
+        """Follows users' likers"""
         if self.aborting:
             return self
 
@@ -1344,7 +1349,7 @@ class InstaPy:
         self.max_posts = max_posts if enabled is True else None
 
     def validate_user_call(self, user_name: str):
-        """ Short call of validate_username() function """
+        """Short call of validate_username() function"""
         validation, details = validate_username(
             self.browser,
             user_name,
@@ -1361,6 +1366,8 @@ class InstaPy:
             self.max_posts,
             self.skip_private,
             self.skip_private_percentage,
+            self.skip_public,
+            self.skip_public_percentage,
             self.skip_no_profile_pic,
             self.skip_no_profile_pic_percentage,
             self.skip_business,
@@ -1390,6 +1397,8 @@ class InstaPy:
         self,
         skip_private: bool = True,
         private_percentage: int = 100,
+        skip_public: bool = False,
+        public_percentage: int = 100,
         skip_no_profile_pic: bool = False,
         no_profile_pic_percentage: int = 100,
         skip_business: bool = False,
@@ -1410,6 +1419,8 @@ class InstaPy:
         self.skip_non_business = skip_non_business
         self.skip_bio_keyword = skip_bio_keyword
         self.mandatory_bio_keywords = mandatory_bio_keywords
+        self.skip_public = skip_public
+        self.skip_public_percentage = public_percentage
         if skip_business:
             self.skip_business_categories = skip_business_categories
             if len(skip_business_categories) == 0:
@@ -1451,7 +1462,7 @@ class InstaPy:
         self.comments_mandatory_words = comments_mandatory_words
 
     def set_simulation(self, enabled: bool = True, percentage: int = 100):
-        """ Sets aside simulation parameters """
+        """Sets aside simulation parameters"""
         if enabled not in [True, False]:
             self.logger.info(
                 "Invalid simulation parameter! Please use correct syntax "
@@ -2385,7 +2396,7 @@ class InstaPy:
             if liked_img < amount:
                 self.logger.info("-------------")
                 self.logger.info(
-                    "--> Given amount not fullfilled, image pool reached its end\n"
+                    "--> Given amount not fulfilled, image pool reached its end\n"
                 )
 
         self.logger.info("User: {}".format(username.encode("utf-8")))
@@ -2703,7 +2714,7 @@ class InstaPy:
             if liked_img < amount:
                 self.logger.info("-------------")
                 self.logger.info(
-                    "--> Given amount not fullfilled, image pool reached its end\n"
+                    "--> Given amount not fulfilled, image pool reached its end\n"
                 )
 
         if len(usernames) > 1:
@@ -3015,7 +3026,7 @@ class InstaPy:
             if liked_img < amount:
                 self.logger.info("-------------")
                 self.logger.info(
-                    "--> Given amount not fullfilled, image pool reached its end\n"
+                    "--> Given amount not fulfilled, image pool reached its end\n"
                 )
 
         # final words
@@ -3052,8 +3063,8 @@ class InstaPy:
 
         try:
             if not url:
-                urls = self.browser.find_elements_by_xpath(
-                    read_xpath(self.__class__.__name__, "main_article")
+                urls = self.browser.find_elements(
+                    By.XPATH, read_xpath(self.__class__.__name__, "main_article")
                 )
                 url = urls[0].get_attribute("href")
                 self.logger.info("new url {}".format(url))
@@ -3629,7 +3640,7 @@ class InstaPy:
         interact: bool = False,
         sleep_delay: int = 600,
     ):
-        """ Follow the `Followers` of given users """
+        """Follow the `Followers` of given users"""
         if self.aborting:
             return self
 
@@ -3817,7 +3828,7 @@ class InstaPy:
         interact: bool = False,
         sleep_delay: int = 600,
     ):
-        """ Follow the `Following` of given users """
+        """Follow the `Following` of given users"""
         if self.aborting:
             return self
 
@@ -4627,7 +4638,7 @@ class InstaPy:
     def pick_nonfollowers(
         self, username: str = None, live_match: bool = False, store_locally: bool = True
     ):
-        """ Returns Nonfollowers data of a given user """
+        """Returns Nonfollowers data of a given user"""
 
         message = "Starting to pick Nonfollowers of {}..".format(username)
         highlight_print(self.username, message, "feature", "info", self.logger)
@@ -4989,7 +5000,7 @@ class InstaPy:
     def interact_by_URL(
         self, urls: list = [], randomize: bool = False, interact: bool = False
     ):
-        """ Interact on posts at given URLs """
+        """Interact on posts at given URLs"""
 
         if self.aborting:
             return self
@@ -5284,7 +5295,7 @@ class InstaPy:
             self.internal_usage.pop(feature)
 
     def live_report(self):
-        """ Report live sessional statistics """
+        """Report live sessional statistics"""
 
         print("")
 
@@ -5356,7 +5367,7 @@ class InstaPy:
             )
 
     def set_do_reply_to_comments(self, enabled: bool = False, percentage: int = 0):
-        """ Define if the comments on posts should be replied """
+        """Define if the comments on posts should be replied"""
 
         self.do_reply_to_comments = enabled
         self.reply_to_comments_percent = percentage
@@ -5364,7 +5375,7 @@ class InstaPy:
         return self
 
     def set_comment_replies(self, replies: list = [], media: str = None):
-        """ Set the replies to comments """
+        """Set the replies to comments"""
 
         if not replies:
             self.logger.info("Please, provide some comment replies for use next time.")
@@ -5381,7 +5392,7 @@ class InstaPy:
         else:
             if media is not None:
                 self.logger.warning(
-                    "Unkown media type set at comment replies! Treating as 'any'."
+                    "Unknown media type set at comment replies! Treating as 'any'."
                 )
 
             self.comment_replies = replies
@@ -5395,7 +5406,7 @@ class InstaPy:
         subjectivity: str = None,
         confidence: bool = 100,
     ):
-        """ Set MeaningCloud Sentiment Analysis API configuration """
+        """Set MeaningCloud Sentiment Analysis API configuration"""
 
         if license_key is None:
             license_key = os.environ.get("MEANINGCLOUD_LIC_KEY")
@@ -5430,7 +5441,7 @@ class InstaPy:
         match_language: bool = False,
         language_code: str = "en",
     ):
-        """ Set Yandex Translate API configuration """
+        """Set Yandex Translate API configuration"""
 
         if API_key is None:
             API_key = os.environ.get("YANDEX_API_KEY")
@@ -5485,7 +5496,7 @@ class InstaPy:
 
         if media not in [MEDIA_PHOTO, MEDIA_VIDEO, None]:
             self.logger.warning(
-                "Unkown media type- '{}' set at"
+                "Unknown media type- '{}' set at"
                 " Interact-By-Comments!\t~treating as any..".format(media)
             )
             media = None
@@ -5838,7 +5849,7 @@ class InstaPy:
             )
 
     def run_time(self):
-        """ Get the time session lasted in seconds """
+        """Get the time session lasted in seconds"""
 
         real_time = time.time()
         run_time = real_time - self.start_time
@@ -5869,8 +5880,8 @@ class InstaPy:
             feed_link = "https://www.instagram.com/accounts/activity/?followRequests=1"
             web_address_navigator(self.browser, feed_link)
 
-            requests_to_confirm = self.browser.find_elements_by_xpath(
-                "//button[text()='Confirm']"
+            requests_to_confirm = self.browser.find_elements(
+                By.XPATH, "//button[text()='Confirm']"
             )
 
             if len(requests_to_confirm) == 0:
@@ -5895,7 +5906,7 @@ class InstaPy:
         return self
 
     def join_pods(self, topic: str = "general", engagement_mode: str = "normal"):
-        """ Join pods """
+        """Join pods"""
         if topic not in self.allowed_pod_topics:
             self.logger.error(
                 "You have entered an invalid topic for pods, allowed topics are : {}. Exiting...".format(
@@ -5925,8 +5936,8 @@ class InstaPy:
             self.logger.info("Downloaded pod_posts : {}".format(pod_posts))
 
             sleep(2)
-            post_link_elems = self.browser.find_elements_by_xpath(
-                "//a[contains(@href, '/p/')]"
+            post_link_elems = self.browser.find_elements(
+                By.XPATH, "//a[contains(@href, '/p/')]"
             )
             post_links = []
             post_link = None
@@ -5947,7 +5958,7 @@ class InstaPy:
                 try:
                     web_address_navigator(self.browser, post_link)
                     sleep(2)
-                    time_element = self.browser.find_element_by_xpath("//div/a/time")
+                    time_element = self.browser.find_element(By.XPATH, "//div/a/time")
                     post_datetime_str = time_element.get_attribute("datetime")
                     post_datetime = datetime.strptime(
                         post_datetime_str, "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -6091,7 +6102,7 @@ class InstaPy:
                 self.logger.error("Failed for {} with Error {}".format(pod_post, err))
 
     def story_by_tags(self, tags: list = None):
-        """ Watch stories for specific tag(s) """
+        """Watch stories for specific tag(s)"""
         if self.aborting:
             return self
 
@@ -6123,7 +6134,7 @@ class InstaPy:
                     self.reels_watched += reels
 
     def story_by_users(self, users: list = None):
-        """ Watch stories for specific user(s)"""
+        """Watch stories for specific user(s)"""
         if self.aborting:
             return self
 
@@ -6155,7 +6166,7 @@ class InstaPy:
                     self.reels_watched += reels
 
     def target_list(self, file):
-        """ Extracts target list from text file """
+        """Extracts target list from text file"""
         target_list = file_handling(file)
 
         if "FileNotFoundError" in target_list:

@@ -1,51 +1,50 @@
 """ Common utilities """
 # import built-in & third-party modules
-import time
+import csv
 import datetime
+import json
+import os
 import random
 import re
-import regex
 import signal
-import os
-import sys
-import csv
 import sqlite3
-import json
-import emoji
-
-from math import ceil
-from math import radians
-from math import cos
-from math import degrees as rad2deg
-from sys import exit as clean_exit
-from platform import system
-from platform import python_version
-from subprocess import call
-from random import randint
-from contextlib import contextmanager
-from tempfile import gettempdir
+import sys
+import time
 from argparse import ArgumentParser
+from contextlib import contextmanager
+from math import ceil, cos
+from math import degrees as rad2deg
+from math import radians
+from platform import python_version, system
+from random import randint
+from subprocess import call
+from sys import exit as clean_exit
+from tempfile import gettempdir
 
+import emoji
+import regex
+from bs4 import BeautifulSoup
 from emoji.unicode_codes import UNICODE_EMOJI
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
+
+# import exceptions
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    StaleElementReferenceException,
+    TimeoutException,
+    WebDriverException,
+)
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.support.ui import WebDriverWait
+
+from .database_engine import get_database
+from .event import Event
+from .quota_supervisor import quota_supervisor
+from .settings import Settings
+from .time_util import sleep, sleep_actual
 
 # import InstaPy modules
 from .xpath import read_xpath
-from .event import Event
-from .settings import Settings
-from .time_util import sleep
-from .time_util import sleep_actual
-from .database_engine import get_database
-from .quota_supervisor import quota_supervisor
-
-# import exceptions
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import StaleElementReferenceException
-from selenium.common.exceptions import WebDriverException
-from selenium.common.exceptions import TimeoutException
-
 
 default_profile_pic_instagram = [
     "https://instagram.flas1-2.fna.fbcdn.net/vp"
@@ -70,7 +69,7 @@ next_screenshot = 1
 
 def is_private_profile(browser, logger, following=True):
     """
-    Verify id account is Private
+    Verify if account is Private
 
     :param browser: The selenium webdriver instance
     :param logger: the logger instance
@@ -78,25 +77,26 @@ def is_private_profile(browser, logger, following=True):
     :return: None if profile cannot be verified
     """
 
-    is_private = None
     try:
-        is_private = browser.execute_script(
-            "return window.__additionalData[Object.keys(window.__additionalData)[0]]."
-            "data.graphql.user.is_private"
-        )
+        # Get profile owner information
+        shared_data = get_shared_data(browser)
 
-    except WebDriverException:
-        try:
-            browser.execute_script("location.reload()")
-            update_activity(browser, state=None)
+        # Sometimes shared_data["entry_data"]["ProfilePage"][0] is empty, but get_additional_data()
+        # fetches all data needed
+        get_key = shared_data.get("entry_data").get("ProfilePage")
 
-            is_private = browser.execute_script(
-                "return window._sharedData.entry_data."
-                "ProfilePage[0].graphql.user.is_private"
+        if get_key:
+            data = get_key[0]
+        else:
+            data = get_additional_data(browser)
+    finally:
+        is_private = data["graphql"]["user"]["is_private"]
+
+        logger.info(
+            "Checked if '{}' is private, and it is: '{}'".format(
+                data["graphql"]["user"]["username"], is_private
             )
-
-        except WebDriverException:
-            return None
+        )
 
     return is_private
 
@@ -141,6 +141,8 @@ def validate_username(
     max_posts,
     skip_private,
     skip_private_percentage,
+    skip_public,
+    skip_public_percentage,
     skip_no_profile_pic,
     skip_no_profile_pic_percentage,
     skip_business,
@@ -365,14 +367,31 @@ def validate_username(
     # skip private
     if skip_private:
         try:
-            browser.find_element_by_xpath(
-                "//*[contains(text(), 'This Account is Private')]"
-            )
-            is_private = True
-        except NoSuchElementException:
-            is_private = False
-        if is_private and (random.randint(0, 100) <= skip_private_percentage):
-            return False, "{} is private account, by default skip\n".format(username)
+            is_private = getUserData("graphql.user.is_private", browser)
+
+            if is_private and (random.randint(0, 100) <= skip_private_percentage):
+                return False, "{} is private account, by default skip\n".format(
+                    username
+                )
+        except:
+            logger.error("~could not check if profile is public or private")
+            return False, "--> Sorry, could not check if profile is public or private\n"
+
+    # skip public
+    if skip_public:
+        try:
+            is_public = not getUserData("graphql.user.is_private", browser)
+
+            if is_public and (random.randint(0, 100) <= skip_public_percentage):
+                return (
+                    False,
+                    "{} is public account, skip because of configuration\n".format(
+                        username
+                    ),
+                )
+        except:
+            logger.error("~could not check if profile is public or private")
+            return False, "--> Sorry, could not check if profile is public or private\n"
 
     # skip no profile pic
     if skip_no_profile_pic:
@@ -404,7 +423,7 @@ def validate_username(
         if skip_non_business and not is_business_account:
             return (
                 False,
-                "--> Skiping non business because skip_non_business set to True",
+                "--> Skipping non business because skip_non_business set to True",
             )
 
         if is_business_account:
@@ -473,19 +492,44 @@ def validate_username(
 def getUserData(
     query,
     browser,
-    basequery="return window.__additionalData[Object.keys(window.__additionalData)[0]].data.",
+    basequery="no-longer-needed",
 ):
-    try:
-        data = browser.execute_script(basequery + query)
-        return data
-    except WebDriverException:
-        browser.execute_script("location.reload()")
-        update_activity(browser, state=None)
+    shared_data = get_shared_data(browser)
 
-        data = browser.execute_script(
-            "return window._sharedData.entry_data.ProfilePage[0]." + query
-        )
-        return data
+    # Sometimes shared_data["entry_data"]["ProfilePage"][0] is empty, but get_additional_data()
+    # fetches all data needed
+    get_key = shared_data.get("entry_data").get("ProfilePage")
+
+    if get_key:
+        data = get_key[0]
+    else:
+        data = get_additional_data(browser)
+
+    if query.find(".") == -1:
+        data = data[query]
+    else:
+        subobjects = query.split(".")
+        for subobject in subobjects:
+            data = data[subobject]
+
+    return data
+
+
+def getMediaData(
+    query,
+    browser,
+):
+    additional_data = get_additional_data(browser)
+    data = additional_data["graphql"]["shortcode_media"]
+
+    if query.find(".") == -1:
+        data = data[query]
+    else:
+        subobjects = query.split(".")
+        for subobject in subobjects:
+            data = data[subobject]
+
+    return data
 
 
 def update_activity(
@@ -641,8 +685,8 @@ def get_active_users(browser, username, posts, boundary, logger):
         )
     except WebDriverException:
         try:
-            topCount_elements = browser.find_elements_by_xpath(
-                read_xpath(get_active_users.__name__, "topCount_elements")
+            topCount_elements = browser.find_elements(
+                By.XPATH, read_xpath(get_active_users.__name__, "topCount_elements")
             )
 
             if topCount_elements:  # prevent an empty string scenario
@@ -688,8 +732,9 @@ def get_active_users(browser, username, posts, boundary, logger):
     while count <= posts:
         # load next post
         try:
-            latest_post = browser.find_element_by_xpath(
-                read_xpath(get_active_users.__name__, "profile_posts").format(count)
+            latest_post = browser.find_element(
+                By.XPATH,
+                read_xpath(get_active_users.__name__, "profile_posts").format(count),
             )
             # avoid no posts
             if latest_post:
@@ -702,8 +747,8 @@ def get_active_users(browser, username, posts, boundary, logger):
             sleep_actual(2)
 
             try:
-                likers_count = browser.find_element_by_xpath(
-                    read_xpath(get_active_users.__name__, "likers_count")
+                likers_count = browser.find_element(
+                    By.XPATH, read_xpath(get_active_users.__name__, "likers_count")
                 ).text
                 if likers_count:  # prevent an empty string scenarios
                     likers_count = format_number(likers_count)
@@ -719,8 +764,8 @@ def get_active_users(browser, username, posts, boundary, logger):
                 logger.info("Failed to get likers count on your post {}".format(count))
                 likers_count = None
             try:
-                likes_button = browser.find_elements_by_xpath(
-                    read_xpath(get_active_users.__name__, "likes_button")
+                likes_button = browser.find_elements(
+                    By.XPATH, read_xpath(get_active_users.__name__, "likes_button")
                 )
 
                 if likes_button != []:
@@ -747,8 +792,8 @@ def get_active_users(browser, username, posts, boundary, logger):
                 continue
 
             # get a reference to the 'Likes' dialog box
-            dialog = browser.find_element_by_xpath(
-                read_xpath("class_selectors", "likes_dialog_body_xpath")
+            dialog = browser.find_element(
+                By.XPATH, read_xpath("class_selectors", "likes_dialog_body_xpath")
             )
 
             scroll_it = True
@@ -883,7 +928,7 @@ def get_active_users(browser, username, posts, boundary, logger):
 
 
 def delete_line_from_file(filepath, userToDelete, logger):
-    """ Remove user's record from the followed pool file after unfollowing """
+    """Remove user's record from the followed pool file after unfollowing"""
     if not os.path.isfile(filepath):
         # in case of there is no any followed pool file yet
         return 0
@@ -1001,7 +1046,7 @@ def click_element(browser, element, tryNum=0):
     specific case. See the following issue for more details
     https://github.com/timgrossmann/InstaPy/issues/1232
 
-    explaination of the following recursive function:
+    explanation of the following recursive function:
       we will attempt to click the element given, if an error is thrown
       we know something is wrong (element not in view, element doesn't
       exist, ...). on each attempt try and move the screen around in
@@ -1108,15 +1153,16 @@ def get_number_of_posts(browser):
         )
     except WebDriverException:
         try:
-            num_of_posts_txt = browser.find_element_by_xpath(
-                read_xpath(get_number_of_posts.__name__, "num_of_posts_txt")
+            num_of_posts_txt = browser.find_element(
+                By.XPATH, read_xpath(get_number_of_posts.__name__, "num_of_posts_txt")
             ).text
 
         except NoSuchElementException:
-            num_of_posts_txt = browser.find_element_by_xpath(
+            num_of_posts_txt = browser.find_element(
+                By.XPATH,
                 read_xpath(
                     get_number_of_posts.__name__, "num_of_posts_txt_no_such_element"
-                )
+                ),
             ).text
 
         num_of_posts_txt = num_of_posts_txt.replace(" ", "")
@@ -1127,7 +1173,7 @@ def get_number_of_posts(browser):
 
 
 def get_relationship_counts(browser, username, logger):
-    """ Gets the followers & following counts of a given user """
+    """Gets the followers & following counts of a given user"""
 
     user_link = "https://www.instagram.com/{}/".format(username)
 
@@ -1144,8 +1190,11 @@ def get_relationship_counts(browser, username, logger):
     except WebDriverException:
         try:
             followers_count = format_number(
-                browser.find_element_by_xpath(
-                    str(read_xpath(get_relationship_counts.__name__, "followers_count"))
+                browser.find_element(
+                    By.XPATH,
+                    str(
+                        read_xpath(get_relationship_counts.__name__, "followers_count")
+                    ),
                 ).text
             )
         except NoSuchElementException:
@@ -1160,15 +1209,15 @@ def get_relationship_counts(browser, username, logger):
 
             except WebDriverException:
                 try:
-                    topCount_elements = browser.find_elements_by_xpath(
+                    topCount_elements = browser.find_elements(
+                        By.XPATH,
                         read_xpath(
                             get_relationship_counts.__name__, "topCount_elements"
-                        )
+                        ),
                     )
 
                     if topCount_elements:
                         followers_count = format_number(topCount_elements[1].text)
-
                     else:
                         logger.info(
                             "Failed to get followers count of '{}'  ~empty "
@@ -1192,8 +1241,11 @@ def get_relationship_counts(browser, username, logger):
     except WebDriverException:
         try:
             following_count = format_number(
-                browser.find_element_by_xpath(
-                    str(read_xpath(get_relationship_counts.__name__, "following_count"))
+                browser.find_element(
+                    By.XPATH,
+                    str(
+                        read_xpath(get_relationship_counts.__name__, "following_count")
+                    ),
                 ).text
             )
 
@@ -1209,15 +1261,15 @@ def get_relationship_counts(browser, username, logger):
 
             except WebDriverException:
                 try:
-                    topCount_elements = browser.find_elements_by_xpath(
+                    topCount_elements = browser.find_elements(
+                        By.XPATH,
                         read_xpath(
                             get_relationship_counts.__name__, "topCount_elements"
-                        )
+                        ),
                     )
 
                     if topCount_elements:
                         following_count = format_number(topCount_elements[2].text)
-
                     else:
                         logger.info(
                             "Failed to get following count of '{}'  ~empty "
@@ -1308,7 +1360,7 @@ def interruption_handler(
 def highlight_print(
     username=None, message=None, priority=None, level=None, logger=None
 ):
-    """ Print headers in a highlighted style """
+    """Print headers in a highlighted style"""
     # can add other highlighters at other priorities enriching this function
 
     # find the number of chars needed off the length of the logger message
@@ -1382,7 +1434,7 @@ def highlight_print(
 
 
 def remove_duplicates(container, keep_order, logger):
-    """ Remove duplicates from all kinds of data types easily """
+    """Remove duplicates from all kinds of data types easily"""
     # add support for data types as needed in future
     # currently only 'list' data type is supported
     if isinstance(container, list):
@@ -1406,7 +1458,7 @@ def remove_duplicates(container, keep_order, logger):
 
 
 def dump_record_activity(profile_name, logger, logfolder):
-    """ Dump the record activity data to a local human-readable JSON """
+    """Dump the record activity data to a local human-readable JSON"""
 
     conn = None
 
@@ -1530,7 +1582,7 @@ def emergency_exit(browser, username, logger):
 
 
 def load_user_id(username, person, logger, logfolder):
-    """ Load the user ID at request from local records """
+    """Load the user ID at request from local records"""
     pool_name = "{0}{1}_followedPool.csv".format(logfolder, username)
     user_id = "undefined"
 
@@ -1562,7 +1614,7 @@ def load_user_id(username, person, logger, logfolder):
 
 
 def check_authorization(browser, username, method, logger, notify=True):
-    """ Check if user is NOW logged in """
+    """Check if user is NOW logged in"""
     if notify is True:
         logger.info("Checking if '{}' is logged in...".format(username))
 
@@ -1623,7 +1675,7 @@ def check_authorization(browser, username, method, logger, notify=True):
 
 
 def get_username(browser, track, logger):
-    """ Get the username of a user from the loaded profile page """
+    """Get the username of a user from the loaded profile page"""
 
     query = None
 
@@ -1660,7 +1712,7 @@ def get_username(browser, track, logger):
 
 
 def find_user_id(browser, track, username, logger):
-    """  Find the user ID from the loaded page """
+    """Find the user ID from the loaded page"""
 
     query = None
     meta_XP = None
@@ -1694,7 +1746,7 @@ def find_user_id(browser, track, username, logger):
         except WebDriverException:
             if track == "post":
                 try:
-                    user_id = browser.find_element_by_xpath(meta_XP).get_attribute(
+                    user_id = browser.find_element(By.XPATH, meta_XP).get_attribute(
                         "content"
                     )
                     if user_id:
@@ -1807,7 +1859,7 @@ def explicit_wait(browser, track, ec_params, logger, timeout=35, notify=True):
 
 
 def get_current_url(browser):
-    """ Get URL of the loaded webpage """
+    """Get URL of the loaded webpage"""
     try:
         current_url = browser.execute_script("return window.location.href")
 
@@ -1822,7 +1874,7 @@ def get_current_url(browser):
 
 
 def get_username_from_id(browser, user_id, logger):
-    """ Convert user ID to username """
+    """Convert user ID to username"""
     # method using graphql 'Account media' endpoint
     logger.info("Trying to find the username from the given user ID by loading a post")
 
@@ -1836,7 +1888,7 @@ def get_username_from_id(browser, user_id, logger):
 
     web_address_navigator(browser, post_url)
     try:
-        pre = browser.find_element_by_tag_name("pre").text
+        pre = browser.find_element(By.TAG_NAME, "pre").text
     except NoSuchElementException:
         logger.info("Encountered an error to find `pre` in page, skipping username.")
         return None
@@ -1900,7 +1952,7 @@ def get_username_from_id(browser, user_id, logger):
 
 
 def is_page_available(browser, logger):
-    """ Check if the page is available and valid """
+    """Check if the page is available and valid"""
     expected_keywords = ["Page Not Found", "Content Unavailable"]
     page_title = get_page_title(browser, logger)
 
@@ -1951,7 +2003,7 @@ def smart_run(session, threaded=False):
 
 
 def reload_webpage(browser):
-    """ Reload the current webpage """
+    """Reload the current webpage"""
     browser.execute_script("location.reload()")
     update_activity(browser, state=None)
     sleep(2)
@@ -1960,7 +2012,7 @@ def reload_webpage(browser):
 
 
 def get_page_title(browser, logger):
-    """ Get the title of the webpage """
+    """Get the title of the webpage"""
     # wait for the current page fully load to get the correct page's title
     explicit_wait(browser, "PFL", [], logger, 10)
 
@@ -1985,7 +2037,7 @@ def get_page_title(browser, logger):
 
 
 def click_visibly(browser, element):
-    """ Click as the element become visible """
+    """Click as the element become visible"""
     if element.is_displayed():
         click_element(browser, element)
 
@@ -2007,7 +2059,7 @@ def click_visibly(browser, element):
 
 
 def get_action_delay(action):
-    """ Get the delay time to sleep after doing actions """
+    """Get the delay time to sleep after doing actions"""
     defaults = {"like": 2, "comment": 2, "follow": 3, "unfollow": 10, "story": 3}
     config = Settings.action_delays
 
@@ -2058,7 +2110,7 @@ def get_action_delay(action):
 
 
 def deform_emojis(text):
-    """ Convert unicode emojis into their text form """
+    """Convert unicode emojis into their text form"""
     new_text = ""
     emojiless_text = ""
     data = regex.findall(r"\X", text)
@@ -2088,17 +2140,23 @@ def deform_emojis(text):
 
 
 def extract_text_from_element(elem):
-    """ As an element is valid and contains text, extract it and return """
-    if elem and hasattr(elem, "text") and elem.text:
-        text = elem.text
-    else:
-        text = None
+    """
+    As an element is valid and contains text, extract it and return
+    Added filter to words that has spaces between them, they for sure are not valid username
+    Error looks like: "User: 'NOVEMBER 5'  |> followers: unknown  |> following: unknown  |> relationship ratio: unknown"
+                       ^^^^^^^^^^^^^^^^^
+    """
 
-    return text
+    # if element is valid and contains text withou spaces
+    if elem and hasattr(elem, "text") and elem.text and not re.search("\s", elem.text):
+        return elem.text
+
+    # if the element is not valid, return None
+    return None
 
 
 def truncate_float(number, precision, round=False):
-    """ Truncate (shorten) a floating point value at given precision """
+    """Truncate (shorten) a floating point value at given precision"""
 
     # don't allow a negative precision [by mistake?]
     precision = abs(precision)
@@ -2123,7 +2181,7 @@ def truncate_float(number, precision, round=False):
 
 
 def get_time_until_next_month():
-    """ Get total seconds remaining until the next month """
+    """Get total seconds remaining until the next month"""
     now = datetime.datetime.now()
     next_month = now.month + 1 if now.month < 12 else 1
     year = now.year if now.month < 12 else now.year + 1
@@ -2135,14 +2193,14 @@ def get_time_until_next_month():
 
 
 def remove_extra_spaces(text):
-    """ Find and remove redundant spaces more than 1 in text """
+    """Find and remove redundant spaces more than 1 in text"""
     new_text = re.sub(r" {2,}", " ", text)
 
     return new_text
 
 
 def has_any_letters(text):
-    """ Check if the text has any letters in it """
+    """Check if the text has any letters in it"""
     # result = re.search("[A-Za-z]", text)   # works only with english letters
     result = any(
         c.isalpha() for c in text
@@ -2217,7 +2275,7 @@ def get_users_from_dialog(old_data, dialog, logger):
     """
 
     try:
-        user_blocks = dialog.find_elements_by_tag_name("a")
+        user_blocks = dialog.find_elements(By.TAG_NAME, "a")
         loaded_users = [
             extract_text_from_element(u)
             for u in user_blocks
@@ -2229,9 +2287,9 @@ def get_users_from_dialog(old_data, dialog, logger):
         return new_data
 
     except (NoSuchElementException, StaleElementReferenceException) as exc:
-        # Catch stale elemets if any
+        # Catch stale elements if any
         logger.error(
-            "Error occured while retrieving data.\n\t{}".format(
+            "Error occurred while retrieving data.\n\t{}".format(
                 str(exc).encode("utf-8")
             )
         )
@@ -2240,7 +2298,7 @@ def get_users_from_dialog(old_data, dialog, logger):
 
 
 def progress_tracker(current_value, highest_value, initial_time, logger):
-    """ Provide a progress tracker to keep value updated until finishes """
+    """Provide a progress tracker to keep value updated until finishes"""
     if current_value is None or highest_value is None or highest_value == 0:
         return
 
@@ -2307,11 +2365,11 @@ def progress_tracker(current_value, highest_value, initial_time, logger):
 
 
 def close_dialog_box(browser):
-    """ Click on the close button spec. in the 'Likes' dialog box """
+    """Click on the close button spec. in the 'Likes' dialog box"""
 
     try:
-        close = browser.find_element_by_xpath(
-            read_xpath("class_selectors", "likes_dialog_close_xpath")
+        close = browser.find_element(
+            By.XPATH, read_xpath("class_selectors", "likes_dialog_close_xpath")
         )
 
         click_element(browser, close)
@@ -2321,7 +2379,7 @@ def close_dialog_box(browser):
 
 
 def parse_cli_args():
-    """ Parse arguments passed by command line interface """
+    """Parse arguments passed by command line interface"""
 
     AP_kwargs = dict(
         prog="InstaPy",
@@ -2422,8 +2480,8 @@ def get_cord_location(browser, location):
     base_url = "https://www.instagram.com/explore/locations/"
     query_url = "{}{}{}".format(base_url, location, "?__a=1")
     browser.get(query_url)
-    json_text = browser.find_element_by_xpath(
-        read_xpath(get_cord_location.__name__, "json_text")
+    json_text = browser.find_element(
+        By.XPATH, read_xpath(get_cord_location.__name__, "json_text")
     ).text
     data = json.loads(json_text)
 
@@ -2520,7 +2578,7 @@ def get_query_hash(browser, logger, edge_followed_by):
 
 
 def file_handling(file):
-    """ Extracts text file's elements """
+    """Extracts text file's elements"""
     elements = []
     try:
         with open(file, "r") as f:
@@ -2558,3 +2616,39 @@ class CustomizedArgumentParser(ArgumentParser):
         will give the location of the 'argparse.py' file that have this method.
         """
         return []
+
+
+def get_additional_data(browser):
+    """
+    Get additional data object from page source
+    Idea and Code by alokkumarsbg
+
+    :param browser: The selenium webdriver instance
+    :return additional_data: Json data from window.__additionalData extracted from page source
+    """
+    additional_data = None
+    soup = BeautifulSoup(browser.page_source, "html.parser")
+    for text in soup(text=re.compile(r"window.__additionalDataLoaded")):
+        if re.search("^window.__additionalDataLoaded", text):
+            additional_data = json.loads(re.search("{.*}", text).group())
+            break
+
+    return additional_data
+
+
+def get_shared_data(browser):
+    """
+    Get shared data object from page source
+    Code by schealex
+
+    :param browser: The selenium webdriver instance
+    :return shared_data: Json data from window._sharedData extracted from page source
+    """
+    shared_data = None
+    soup = BeautifulSoup(browser.page_source, "html.parser")
+    for text in soup(text=re.compile(r"window._sharedData")):
+        if re.search("^window._sharedData", text):
+            shared_data = json.loads(re.search("{.*}", text).group())
+            break
+
+    return shared_data

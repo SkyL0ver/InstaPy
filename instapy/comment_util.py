@@ -2,37 +2,45 @@
 """ Module which handles the commenting features """
 # import built-in & third-party modules
 import random
+
 import emoji
+
+# import exceptions
+from selenium.common.exceptions import (
+    InvalidElementStateException,
+    NoSuchElementException,
+    WebDriverException,
+)
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+
+from .event import Event
+from .quota_supervisor import quota_supervisor
 
 # import InstaPy modules
 from .time_util import sleep
-from .util import update_activity
-from .util import add_user_to_blacklist
-from .util import click_element
-from .util import get_action_delay
-from .util import explicit_wait
-from .util import web_address_navigator
-from .util import evaluate_mandatory_words
-from .event import Event
-from .quota_supervisor import quota_supervisor
+from .util import (
+    add_user_to_blacklist,
+    click_element,
+    evaluate_mandatory_words,
+    explicit_wait,
+    get_action_delay,
+    getMediaData,
+    update_activity,
+    web_address_navigator,
+)
 from .xpath import read_xpath
-
-# import exceptions
-from selenium.common.exceptions import WebDriverException
-from selenium.common.exceptions import InvalidElementStateException
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys
 
 
 def get_comment_input(browser):
-    comment_input = browser.find_elements_by_xpath(
-        read_xpath(get_comment_input.__name__, "comment_input")
+    comment_input = browser.find_elements(
+        By.XPATH, read_xpath(get_comment_input.__name__, "comment_input")
     )
 
     if len(comment_input) <= 0:
-        comment_input = browser.find_elements_by_xpath(
-            read_xpath(get_comment_input.__name__, "placeholder")
+        comment_input = browser.find_elements(
+            By.XPATH, read_xpath(get_comment_input.__name__, "placeholder")
         )
 
     return comment_input
@@ -44,8 +52,8 @@ def open_comment_section(browser, logger):
         "\t~may cause issues with browser windows of smaller widths"
     )
 
-    comment_elem = browser.find_elements_by_xpath(
-        read_xpath(open_comment_section.__name__, "comment_elem")
+    comment_elem = browser.find_elements(
+        By.XPATH, read_xpath(open_comment_section.__name__, "comment_elem")
     )
 
     if len(comment_elem) > 0:
@@ -164,7 +172,7 @@ def verify_commenting(browser, maximum, minimum, logger):
         return False, disapproval_reason
 
     elif minimum is not None and comments_count < minimum:
-        disapproval_reason = "Not commented on this post! ~less comments exist off minumum limit at {}".format(
+        disapproval_reason = "Not commented on this post! ~less comments exist off minimum limit at {}".format(
             comments_count
         )
         return False, disapproval_reason
@@ -180,20 +188,16 @@ def verify_mandatory_words(
 ):
     if len(mand_words) > 0 or isinstance(comments[0], dict):
         try:
-            post_desc = browser.execute_script(
-                "return window.__additionalData[Object.keys(window.__additionalData)[0]].data."
-                "graphql.shortcode_media."
-                "edge_media_to_caption.edges[0]['node']['text']"
+            post_desc = getMediaData(
+                "edge_media_to_caption.edges.0.node.text", browser
             ).lower()
 
         except Exception:
             post_desc = None
 
         try:
-            first_comment = browser.execute_script(
-                "return window.__additionalData[Object.keys(window.__additionalData)[0]].data."
-                "graphql.shortcode_media."
-                "edge_media_to_parent_comment.edges[0]['node']['text']"
+            first_comment = getMediaData(
+                "edge_media_to_parent_comment.edges.0.node.text", browser
             ).lower()
 
         except Exception:
@@ -236,7 +240,7 @@ def verify_mandatory_words(
 def get_comments_on_post(
     browser, owner, poster, amount, post_link, ignore_users, randomize, logger
 ):
-    """ Fetch comments data on posts """
+    """Fetch comments data on posts"""
     web_address_navigator(browser, post_link)
 
     comments = []
@@ -268,18 +272,15 @@ def get_comments_on_post(
     explicit_wait(browser, "PFL", [], logger, 10)
 
     try:
-        all_comment_like_buttons = browser.find_elements_by_xpath(
-            like_button_full_XPath
+        all_comment_like_buttons = browser.find_elements(
+            By.XPATH, like_button_full_XPath
         )
 
         if all_comment_like_buttons:
             commenter = None
             comment = None
 
-            data = browser.execute_script(
-                "return window.__additionalData[Object.keys(window.__additionalData)].data."
-                "graphql.shortcode_media.edge_media_to_parent_comment"
-            )
+            data = getMediaData("edge_media_to_parent_comment", browser)
             for value in data["edges"]:
                 commenter = value["node"]["owner"]["username"]
                 comment = value["node"]["text"]
@@ -296,8 +297,8 @@ def get_comments_on_post(
                     logger.info("Could not grab any commenter from this post")
 
         else:
-            comment_unlike_buttons = browser.find_elements_by_xpath(
-                unlike_button_full_XPath
+            comment_unlike_buttons = browser.find_elements(
+                By.XPATH, unlike_button_full_XPath
             )
 
             if comment_unlike_buttons:
@@ -333,29 +334,9 @@ def get_comments_on_post(
 
 
 def is_commenting_enabled(browser, logger):
-    """ Find out if commenting on the post is enabled """
+    """Find out if commenting on the post is enabled"""
 
-    try:
-        comments_disabled = browser.execute_script(
-            "return window.__additionalData[Object.keys(window.__additionalData)[0]].data"
-            ".graphql.shortcode_media.comments_disabled"
-        )
-
-    except WebDriverException:
-        try:
-            browser.execute_script("location.reload()")
-            update_activity(browser, state=None)
-
-            comments_disabled = browser.execute_script(
-                "return window.__additionalData[Object.keys(window.__additionalData)[0]].data"
-                ".graphql.shortcode_media.comments_disabled"
-            )
-
-        except Exception as e:
-            msg = "Failed to check comments' status for verification!\n\t{}".format(
-                str(e).encode("utf-8")
-            )
-            return False, msg
+    comments_disabled = getMediaData("comments_disabled", browser)
 
     if comments_disabled is True:
         msg = "Comments are disabled for this post."
@@ -365,22 +346,14 @@ def is_commenting_enabled(browser, logger):
 
 
 def get_comments_count(browser, logger):
-    """ Get the number of total comments in the post """
-    try:
-        comments_count = browser.execute_script(
-            "return window.__additionalData[Object.keys(window.__additionalData)[0]].data"
-            ".graphql.shortcode_media.edge_media_preview_comment.count"
-        )
+    """Get the number of total comments in the post"""
 
-    except Exception as e:
-        msg = "Failed to get comments' count!\n\t{}".format(str(e).encode("utf-8"))
-        return None, msg
-
+    comments_count = getMediaData("edge_media_preview_comment.count", browser)
     return comments_count, "Success"
 
 
 def verify_commented_image(browser, link, owner, logger):
-    """ Fetch comments data on posts to determine if already commented """
+    """Fetch comments data on posts to determine if already commented"""
 
     web_address_navigator(browser, link)
 
@@ -390,10 +363,7 @@ def verify_commented_image(browser, link, owner, logger):
     try:
         commenter = None
         comment = None
-        data = browser.execute_script(
-            "return window.__additionalData[Object.keys(window.__additionalData)].data."
-            "graphql.shortcode_media.edge_media_to_parent_comment"
-        )
+        data = getMediaData("edge_media_to_parent_comment", browser)
         for value in data["edges"]:
             commenter = value["node"]["owner"]["username"]
             comment = value["node"]["text"]
@@ -476,7 +446,7 @@ def process_comments(
 
         if commented_image:
             # The post has already been commented, either manually or InstaPy
-            # Commenting twice by InstaPy user is not allowd by now or could
+            # Commenting twice by InstaPy user is not allowed by now or could
             # not get comments on this post to check if InstaPy user commented
             # before, so will not comment until next check
             logger.info(message)

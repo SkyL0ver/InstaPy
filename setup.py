@@ -12,7 +12,7 @@ import re
 
 
 summary = "Tool for automated Instagram interactions"
-project_homepage = "https://github.com/timgrossmann/InstaPy"
+project_homepage = "https://github.com/InstaPy/InstaPy"
 here = path.abspath(path.dirname(__file__))
 
 
@@ -82,15 +82,16 @@ setup(
         "Topic :: Utilities",
         "Topic :: Software Development :: Build Tools",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Natural Language :: English",
     ],
     install_requires=dependencies,
     extras_require={"test": ["tox", "virtualenv", "tox-venv"]},
-    python_requires=">=3, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*",
+    python_requires=">=3.5",
     platforms=["win32", "linux", "linux2", "darwin"],
     zip_safe=False,
     entry_points={"console_scripts": []},

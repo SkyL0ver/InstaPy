@@ -1,51 +1,55 @@
 """ Module which handles the follow features like unfollowing and following """
 # import built-in & third-party modules
+import csv
+import json
 import os
 import random
-import json
-import csv
 import sqlite3
-
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from math import ceil
+
+# import exceptions
+from selenium.common.exceptions import (
+    ElementNotVisibleException,
+    NoSuchElementException,
+    WebDriverException,
+)
+from selenium.webdriver.common.by import By
+
+from .database_engine import get_database
+from .event import Event
+from .follow_util import get_following_status
+from .print_log_writer import (
+    get_log_time,
+    log_followed_pool,
+    log_record_all_unfollowed,
+    log_uncertain_unfollowed_pool,
+)
+from .quota_supervisor import quota_supervisor
+from .relationship_tools import get_followers, get_following, get_nonfollowers
 
 # import InstaPy modules
 from .time_util import sleep
-from .util import delete_line_from_file
-from .util import format_number
-from .util import update_activity
-from .util import add_user_to_blacklist
-from .util import click_element
-from .util import web_address_navigator
-from .util import get_relationship_counts
-from .util import emergency_exit
-from .util import find_user_id
-from .util import is_page_available
-from .util import reload_webpage
-from .util import click_visibly
-from .util import get_action_delay
-from .util import truncate_float
-from .util import get_query_hash
-from .util import is_follow_me
-from .util import get_epoch_time_diff
-from .follow_util import get_following_status
-from .print_log_writer import log_followed_pool
-from .print_log_writer import log_uncertain_unfollowed_pool
-from .print_log_writer import log_record_all_unfollowed
-from .print_log_writer import get_log_time
-from .relationship_tools import get_followers
-from .relationship_tools import get_nonfollowers
-from .relationship_tools import get_following
-from .database_engine import get_database
-from .quota_supervisor import quota_supervisor
-from .event import Event
+from .util import (
+    add_user_to_blacklist,
+    click_element,
+    click_visibly,
+    delete_line_from_file,
+    emergency_exit,
+    find_user_id,
+    format_number,
+    get_action_delay,
+    get_epoch_time_diff,
+    get_query_hash,
+    get_relationship_counts,
+    is_follow_me,
+    is_page_available,
+    reload_webpage,
+    truncate_float,
+    update_activity,
+    web_address_navigator,
+)
 from .xpath import read_xpath
-
-# import exceptions
-from selenium.common.exceptions import WebDriverException
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import ElementNotVisibleException
 
 
 def set_automated_followed_pool(
@@ -56,7 +60,7 @@ def set_automated_followed_pool(
     delay_followbackers,
     pool="followedPool",
 ):
-    """ Generate a user list based on the InstaPy followed usernames """
+    """Generate a user list based on the InstaPy followed usernames"""
     pool_name = "{0}{1}_{2}.csv".format(logfolder, username, pool)
     automatedFollowedPool = {"all": {}, "eligible": {}}
     time_stamp = None
@@ -166,7 +170,7 @@ def unfollow(
     logger,
     logfolder,
 ):
-    """ Unfollows the given amount of users"""
+    """Unfollows the given amount of users"""
 
     msg = None
     unfollow_num = 0
@@ -209,7 +213,7 @@ def unfollow(
     # then do not navigate to it again
     web_address_navigator(browser, user_link)
 
-    # check how many poeple we are following
+    # check how many people we are following
     _, allfollowing = get_relationship_counts(browser, username, logger)
 
     if allfollowing is None:
@@ -540,11 +544,11 @@ def follow_user(browser, track, login, user_name, button, blacklist, logger, log
         return False, "jumped"
 
     if track in ["profile", "post"]:
-        if track == "profile":
-            # check URL of the webpage, if it already is user's profile
-            # page, then do not navigate to it again
-            user_link = "https://www.instagram.com/{}/".format(user_name)
-            web_address_navigator(browser, user_link)
+        # if track == "profile":
+        # check URL of the webpage, if it already is user's profile
+        # page, then do not navigate to it again
+        user_link = "https://www.instagram.com/{}/".format(user_name)
+        web_address_navigator(browser, user_link)
 
         # find out CURRENT following status
         following_status, follow_button = get_following_status(
@@ -649,7 +653,7 @@ def get_users_through_dialog_with_graphql(
     edge_followed_by,
 ):
 
-    # TODO: simulation implmentation
+    # TODO: simulation implementation
 
     real_amount = amount
     followers_list = []
@@ -698,9 +702,9 @@ def get_users_through_dialog_with_graphql(
 
     web_address_navigator(browser, url)
 
-    pre = browser.find_element_by_tag_name("pre")
+    pre = browser.find_element(By.TAG_NAME, "pre").text
     # set JSON object
-    data = json.loads(pre.text)
+    data = json.loads(pre)
 
     try:
         # get all followers or following of current page
@@ -743,10 +747,10 @@ def get_users_through_dialog_with_graphql(
 
         url = "{}&variables={}".format(graphql_query_URL, str(json.dumps(variables)))
         browser.get(url)
-        pre = browser.find_element_by_tag_name("pre")
+        pre = browser.find_element(By.TAG_NAME, "pre").text
 
         # response to JSON object
-        data = json.loads(pre.text)
+        data = json.loads(pre)
 
         try:
             # get all followers of current page
@@ -829,7 +833,7 @@ def get_users_through_dialog_with_graphql(
 
 
 def dialog_username_extractor(buttons):
-    """ Extract username of a follow button from a dialog box """
+    """Extract username of a follow button from a dialog box"""
 
     if not isinstance(buttons, list):
         buttons = [buttons]
@@ -839,14 +843,14 @@ def dialog_username_extractor(buttons):
         if person and hasattr(person, "text") and person.text:
             try:
                 xpath = read_xpath(dialog_username_extractor.__name__, "person")
-                element_by_xpath = person.find_element_by_xpath(xpath)
-                elements_by_tag_name = element_by_xpath.find_elements_by_tag_name("a")[
+                element_by_xpath = person.find_element(By.XPATH, xpath)
+                elements_by_tag_name = element_by_xpath.find_elements(By.TAG_NAME, "a")[
                     0
                 ].text
 
                 if elements_by_tag_name == "":
-                    elements_by_tag_name = element_by_xpath.find_elements_by_tag_name(
-                        "a"
+                    elements_by_tag_name = element_by_xpath.find_elements(
+                        By.TAG_NAME, "a"
                     )[1].text
 
                 person_list.append(elements_by_tag_name)
@@ -870,7 +874,7 @@ def follow_through_dialog(
     logger,
     logfolder,
 ):
-    """ Will follow username directly inside a dialog box """
+    """Will follow username directly inside a dialog box"""
     if not isinstance(person_list, list):
         person_list = [person_list]
 
@@ -983,8 +987,8 @@ def get_given_user_followers(
 
     # locate element to user's followers
     try:
-        followers_link = browser.find_element_by_xpath(
-            read_xpath(get_given_user_followers.__name__, "followers_link")
+        followers_link = browser.find_element(
+            By.XPATH, read_xpath(get_given_user_followers.__name__, "followers_link")
         )
         click_element(browser, followers_link)
         # update server calls
@@ -1058,14 +1062,14 @@ def get_given_user_following(
     if not is_page_available(browser, logger):
         return [], []
 
-    #  check how many poeple are following this user.
+    #  check how many people are following this user.
     #  throw RuntimeWarning if we are 0 people following this user
     try:
         # allfollowing = format_number(
-        #    browser.find_element_by_xpath(read_xpath(get_given_user_following.__name__,"all_following")).text)
+        #    browser.find_element(By.XPATH, read_xpath(get_given_user_following.__name__,"all_following")).text)
         allfollowing = format_number(
-            browser.find_element_by_xpath(
-                read_xpath(get_given_user_following.__name__, "all_following")
+            browser.find_element(
+                By.XPATH, read_xpath(get_given_user_following.__name__, "all_following")
             ).text
         )
 
@@ -1089,10 +1093,11 @@ def get_given_user_following(
 
             except WebDriverException:
                 try:
-                    topCount_elements = browser.find_elements_by_xpath(
+                    topCount_elements = browser.find_elements(
+                        By.XPATH,
                         read_xpath(
                             get_given_user_following.__name__, "topCount_elements"
-                        )
+                        ),
                     )
 
                     if topCount_elements:
@@ -1124,10 +1129,11 @@ def get_given_user_following(
         )
 
     try:
-        following_link = browser.find_elements_by_xpath(
+        following_link = browser.find_elements(
+            By.XPATH,
             read_xpath(get_given_user_following.__name__, "following_link").format(
                 user_name
-            )
+            ),
         )
         click_element(browser, following_link[0])
         # update server calls
@@ -1165,7 +1171,7 @@ def get_given_user_following(
 
 
 def dump_follow_restriction(profile_name, logger, logfolder):
-    """ Dump follow restriction data to a local human-readable JSON """
+    """Dump follow restriction data to a local human-readable JSON"""
 
     conn = None
 
@@ -1295,7 +1301,7 @@ def unfollow_user(
     logger,
     logfolder,
 ):
-    """ Unfollow a user either from the profile or post page or dialog box """
+    """Unfollow a user either from the profile or post page or dialog box"""
     # list of available tracks to unfollow in: ["profile", "post dialog]
     # check action availability
     if quota_supervisor("unfollows") == "jump":
@@ -1405,7 +1411,7 @@ def unfollow_user(
 
 
 def confirm_unfollow(browser):
-    """ Deal with the confirmation dialog boxes during an unfollow """
+    """Deal with the confirmation dialog boxes during an unfollow"""
     attempt = 0
 
     while attempt < 3:
@@ -1415,7 +1421,7 @@ def confirm_unfollow(browser):
                 confirm_unfollow.__name__, "button_xp"
             )  # "//button[contains(
             # text(), 'Unfollow')]"
-            unfollow_button = browser.find_element_by_xpath(button_xp)
+            unfollow_button = browser.find_element(By.XPATH, button_xp)
 
             if unfollow_button.is_displayed():
                 click_element(browser, unfollow_button)
@@ -1434,7 +1440,7 @@ def confirm_unfollow(browser):
 def post_unfollow_cleanup(
     state, username, person, relationship_data, person_id, logger, logfolder
 ):
-    """ Casual local data cleaning after an unfollow """
+    """Casual local data cleaning after an unfollow"""
     if not isinstance(state, list):
         state = [state]
 
@@ -1461,27 +1467,27 @@ def post_unfollow_cleanup(
 
 
 def get_buttons_from_dialog(dialog, channel):
-    """ Gets buttons from the `Followers` or `Following` dialog boxes"""
+    """Gets buttons from the `Followers` or `Following` dialog boxes"""
 
     buttons = None
 
     if channel == "Follow":
         # get follow buttons. This approach will find the follow buttons and
         # ignore the Unfollow/Requested buttons.
-        buttons = dialog.find_elements_by_xpath(
-            read_xpath(get_buttons_from_dialog.__name__, "follow_button")
+        buttons = dialog.find_elements(
+            By.XPATH, read_xpath(get_buttons_from_dialog.__name__, "follow_button")
         )
 
     elif channel == "Unfollow":
-        buttons = dialog.find_elements_by_xpath(
-            read_xpath(get_buttons_from_dialog.__name__, "unfollow_button")
+        buttons = dialog.find_elements(
+            By.XPATH, read_xpath(get_buttons_from_dialog.__name__, "unfollow_button")
         )
 
     return buttons
 
 
 def get_user_id(browser, track, username, logger):
-    """ Get user's ID either from a profile page or post page """
+    """Get user's ID either from a profile page or post page"""
     user_id = "unknown"
 
     if track != "dialog":  # currently do not get the user ID for follows
@@ -1494,7 +1500,7 @@ def get_user_id(browser, track, username, logger):
 def verify_action(
     browser, action, track, username, person, person_id, logger, logfolder
 ):
-    """ Verify if the action has succeeded """
+    """Verify if the action has succeeded"""
     # currently supported actions are follow & unfollow
 
     retry_count = 0
@@ -1507,12 +1513,12 @@ def verify_action(
         button_change = False
 
         if action == "follow":
-            post_action_text_correct = ["Following", "Requested"]
+            post_action_text_correct = ["Following", "Requested", "Message"]
             post_action_text_fail = ["Follow", "Follow Back", "Unblock"]
 
         elif action == "unfollow":
             post_action_text_correct = ["Follow", "Follow Back", "Unblock"]
-            post_action_text_fail = ["Following", "Requested"]
+            post_action_text_fail = ["Following", "Requested", "Message"]
 
         while True:
 
@@ -1551,6 +1557,20 @@ def verify_action(
 
                     sleep(4)
                 elif retry_count == 3:
+                    user_link = "https://www.instagram.com/{}/".format(person)
+                    web_address_navigator(browser, user_link)
+                    follow_button_xp = read_xpath(
+                        "get_following_status", "follow_button_XP"
+                    )
+                    button = browser.find_element(By.XPATH, follow_button_xp)
+                    try:
+                        button.click()
+                    except:
+                        return False, "unexpected"
+                    sleep(random.randint(4, 7))
+                    return True, "success"
+
+                elif retry_count == 4:
                     logger.warning(
                         "Last {0} is not verified."
                         "\t~'{1}' might be temporarily blocked "
@@ -1569,7 +1589,7 @@ def post_unfollow_actions(browser, person, logger):
 
 
 def get_follow_requests(browser, amount, sleep_delay, logger, logfolder):
-    """ Get follow requests from instagram access tool list """
+    """Get follow requests from instagram access tool list"""
 
     user_link = "https://www.instagram.com/accounts/access_tool/current_follow_requests"
     web_address_navigator(browser, user_link)
@@ -1585,8 +1605,8 @@ def get_follow_requests(browser, amount, sleep_delay, logger, logfolder):
         and view_more_button_exist
     ):
         sleep(4)
-        list_of_users = browser.find_elements_by_xpath(
-            read_xpath(get_follow_requests.__name__, "list_of_users")
+        list_of_users = browser.find_elements(
+            By.XPATH, read_xpath(get_follow_requests.__name__, "list_of_users")
         )
 
         if len(list_of_users) == 0:
@@ -1594,8 +1614,8 @@ def get_follow_requests(browser, amount, sleep_delay, logger, logfolder):
             break
 
         try:
-            view_more_button = browser.find_element_by_xpath(
-                read_xpath(get_follow_requests.__name__, "view_more_button")
+            view_more_button = browser.find_element(
+                By.XPATH, read_xpath(get_follow_requests.__name__, "view_more_button")
             )
         except NoSuchElementException:
             view_more_button_exist = False

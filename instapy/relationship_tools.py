@@ -1,23 +1,26 @@
 # import built-in & third-party modules
+import glob
+import json
+import os
+import random
 import time
 from datetime import datetime
-import os
-import glob
-import random
-import json
+
+# import exceptions
+from selenium.common.exceptions import NoSuchElementException, WebDriverException
+from selenium.webdriver.common.by import By
 
 # import InstaPy modules
 from .follow_util import get_following_status
 from .time_util import sleep
-from .util import web_address_navigator
-from .util import get_relationship_counts
-from .util import interruption_handler
-from .util import is_private_profile
-from .util import truncate_float
-from .util import progress_tracker
-
-# import exceptions
-from selenium.common.exceptions import NoSuchElementException, WebDriverException
+from .util import (
+    get_relationship_counts,
+    interruption_handler,
+    is_private_profile,
+    progress_tracker,
+    truncate_float,
+    web_address_navigator,
+)
 
 
 def get_followers(
@@ -32,7 +35,7 @@ def get_followers(
     logfolder,
     verified_only=False,
 ):
-    """ Get entire list of followers using graphql queries. """
+    """Get entire list of followers using graphql queries."""
 
     # Variables
     user_data = {}
@@ -79,7 +82,7 @@ def get_followers(
 
     is_private = is_private_profile(browser, logger, following_status == "Following")
 
-    if (
+    if not username == self_username and (
         is_private is None
         or (is_private is True and following_status not in ["Following", True])
         or (following_status == "Blocked")
@@ -174,7 +177,7 @@ def get_followers(
         # fetch all user while still has data
         while has_next_data:
             try:
-                pre = browser.find_element_by_tag_name("pre").text
+                pre = browser.find_element(By.TAG_NAME, "pre").text
             except NoSuchElementException as exc:
                 logger.info(
                     "Encountered an error to find `pre` in page!"
@@ -331,7 +334,7 @@ def get_following(
     logger,
     logfolder,
 ):
-    """ Get entire list of following using graphql queries. """
+    """Get entire list of following using graphql queries."""
 
     # Variables
     user_data = {}
@@ -372,7 +375,7 @@ def get_following(
     )
 
     is_private = is_private_profile(browser, logger, following_status == "Following")
-    if (
+    if not username == self_username and (
         is_private is None
         or (is_private is True and following_status not in ["Following", True])
         or (following_status == "Blocked")
@@ -472,7 +475,7 @@ def get_following(
         # fetch all user while still has data
         while has_next_data:
             try:
-                pre = browser.find_element_by_tag_name("pre").text
+                pre = browser.find_element(By.TAG_NAME, "pre").text
             except NoSuchElementException as exc:
                 logger.info(
                     "Encountered an error to find `pre` in page!"
@@ -735,7 +738,7 @@ def get_nonfollowers(
     logger,
     logfolder,
 ):
-    """ Finds Nonfollowers of a given user """
+    """Finds Nonfollowers of a given user"""
 
     if username is None or not isinstance(username, str):
         logger.info(
@@ -809,7 +812,7 @@ def get_fans(
     logger,
     logfolder,
 ):
-    """ Find Fans of a given user """
+    """Find Fans of a given user"""
 
     if username is None or not isinstance(username, str):
         logger.info(
@@ -877,7 +880,7 @@ def get_mutual_following(
     logger,
     logfolder,
 ):
-    """ Find Mutual Following of a given user """
+    """Find Mutual Following of a given user"""
 
     if username is None or type(username) != str:
         logger.info(
@@ -942,7 +945,7 @@ def get_mutual_following(
 
 
 def store_followers_data(username, grab, grabbed_followers, logger, logfolder):
-    """Store grabbed `Followers` data in a local storage at genereated date"""
+    """Store grabbed `Followers` data in a local storage at generated date"""
     query_date = datetime.today().strftime("%d-%m-%Y")
     grabbed_followers_size = len(grabbed_followers)
     file_directory = "{}/relationship_data/{}/followers/".format(logfolder, username)
@@ -974,7 +977,7 @@ def store_followers_data(username, grab, grabbed_followers, logger, logfolder):
 
 
 def store_following_data(username, grab, grabbed_following, logger, logfolder):
-    """ Store grabbed `Following` data in a local storage at generated date """
+    """Store grabbed `Following` data in a local storage at generated date"""
     query_date = datetime.today().strftime("%d-%m-%Y")
     grabbed_following_size = len(grabbed_following)
     file_directory = "{}/relationship_data/{}/following/".format(logfolder, username)
@@ -1006,7 +1009,7 @@ def store_following_data(username, grab, grabbed_following, logger, logfolder):
 
 
 def store_all_unfollowers(username, all_unfollowers, logger, logfolder):
-    """ Store all Unfollowers data in a local storage at generated date """
+    """Store all Unfollowers data in a local storage at generated date"""
     generation_date = datetime.today().strftime("%d-%m-%Y")
     all_unfollowers_size = len(all_unfollowers)
     file_directory = "{}/relationship_data/{}/unfollowers/all_unfollowers/".format(
@@ -1039,7 +1042,7 @@ def store_all_unfollowers(username, all_unfollowers, logger, logfolder):
 
 
 def store_active_unfollowers(username, active_unfollowers, logger, logfolder):
-    """ Store active Unfollowers data in a local storage at generated date """
+    """Store active Unfollowers data in a local storage at generated date"""
     generation_date = datetime.today().strftime("%d-%m-%Y")
     active_unfollowers_size = len(active_unfollowers)
     file_directory = (
@@ -1077,7 +1080,7 @@ def store_active_unfollowers(username, active_unfollowers, logger, logfolder):
 def store_nonfollowers(
     username, followers_size, following_size, nonfollowers, logger, logfolder
 ):
-    """ Store Nonfollowers data in a local storage at generated date """
+    """Store Nonfollowers data in a local storage at generated date"""
     generation_date = datetime.today().strftime("%d-%m-%Y")
     nonfollowers_size = len(nonfollowers)
     file_directory = "{}/relationship_data/{}/nonfollowers/".format(logfolder, username)
@@ -1112,7 +1115,7 @@ def store_nonfollowers(
 
 
 def store_fans(username, followers_size, following_size, fans, logger, logfolder):
-    """ Store Fans data in a local storage at generated date """
+    """Store Fans data in a local storage at generated date"""
     generation_date = datetime.today().strftime("%d-%m-%Y")
     fans_size = len(fans)
 
@@ -1148,7 +1151,7 @@ def store_fans(username, followers_size, following_size, fans, logger, logfolder
 def store_mutual_following(
     username, followers_size, following_size, mutual_following, logger, logfolder
 ):
-    """ Store Mutual Following data in a local storage at generated date """
+    """Store Mutual Following data in a local storage at generated date"""
     generation_date = datetime.today().strftime("%d-%m-%Y")
     mutual_following_size = len(mutual_following)
 
@@ -1189,7 +1192,7 @@ def store_mutual_following(
 
 
 def load_followers_data(username, compare_by, compare_track, logger, logfolder):
-    """ Write grabbed `followers` data into local storage """
+    """Write grabbed `followers` data into local storage"""
 
     # Variables
     tracked_filenames = []

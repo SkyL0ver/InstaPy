@@ -1,8 +1,8 @@
 """Module which handles the clarifai api and checks
 the image for invalid content"""
-from clarifai.rest import ClarifaiApp
-from clarifai.rest import Workflow
+from clarifai.rest import ClarifaiApp, Workflow
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
 
 from .xpath import read_xpath
 
@@ -102,7 +102,7 @@ def check_image(
 
 
 def given_tags_in_result(search_tags, clarifai_tags, full_match=False):
-    """Checks the clarifai tags if it contains one (or all) search tags """
+    """Checks the clarifai tags if it contains one (or all) search tags"""
     if full_match:
         return all([tag in clarifai_tags for tag in search_tags])
     else:
@@ -119,19 +119,19 @@ def get_source_link(browser):
 
     try:
         source.append(
-            browser.find_element_by_xpath(
-                read_xpath(get_source_link.__name__, "image")
+            browser.find_element(
+                By.XPATH, read_xpath(get_source_link.__name__, "image")
             ).get_attribute("src")
         )
     except NoSuchElementException:
         source.append(
-            browser.find_element_by_xpath(
-                read_xpath(get_source_link.__name__, "video")
+            browser.find_element(
+                By.XPATH, read_xpath(get_source_link.__name__, "video")
             ).get_attribute("src")
         )
         source.append(
-            browser.find_element_by_xpath(
-                read_xpath(get_source_link.__name__, "image_alt")
+            browser.find_element(
+                By.XPATH, read_xpath(get_source_link.__name__, "image_alt")
             ).get_attribute("src")
         )
 
